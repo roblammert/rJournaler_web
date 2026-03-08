@@ -15,7 +15,7 @@ return [
     'env' => env('APP_ENV', 'development'),
     'debug' => (bool) env('APP_DEBUG', true),
     'url' => (string) env('APP_URL', 'http://localhost:8080'),
-    'version' => (string) env('APP_VERSION', '1.0.0'),
+    'version' => (string) env('APP_VERSION', '1.0.1'),
     'timezone' => (string) env('APP_TIMEZONE', 'UTC'),
     'session' => [
         'name' => (string) env('SESSION_NAME', 'rjournaler_session'),

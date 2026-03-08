@@ -11,7 +11,7 @@ use App\Core\Database;
 header('Content-Type: application/json; charset=utf-8');
 
 const WEATHER_CACHE_TTL_SECONDS = 3600;
-const WEATHER_REFRESH_LOCK_SECONDS = 120;
+const WEATHER_REFRESH_LOCK_SECONDS = 45;
 
 $defaultPresets = [
     'new_york_us' => [
@@ -170,8 +170,11 @@ function fetchWeatherForLocation(array $location): array
 {
     $projectRoot = dirname(__DIR__, 2);
     $scriptPath = $projectRoot . '/python/weather/noaa_weather.py';
-    $venvPython = $projectRoot . '/.venv/Scripts/python.exe';
-    $pythonBin = is_file($venvPython) ? $venvPython : 'python';
+    $venvPythonWindows = $projectRoot . '/.venv/Scripts/python.exe';
+    $venvPythonLinux = $projectRoot . '/.venv/bin/python';
+    $pythonBin = is_file($venvPythonWindows)
+        ? $venvPythonWindows
+        : (is_file($venvPythonLinux) ? $venvPythonLinux : (strtoupper((string) PHP_OS_FAMILY) === 'WINDOWS' ? 'python' : 'python3'));
 
     $arg = json_encode($location, JSON_UNESCAPED_SLASHES);
     if (!is_string($arg) || $arg === '') {
@@ -365,6 +368,12 @@ function markRefreshInProgress(int $userId, string $selectedKey): void
     @file_put_contents($lockPath, (string) time(), LOCK_EX);
 }
 
+function clearRefreshInProgress(int $userId, string $selectedKey): void
+{
+    $lockPath = weatherRefreshLockPath($userId, $selectedKey);
+    @unlink($lockPath);
+}
+
 function launchWeatherRefreshJob(int $userId, string $selectedKey, array $selectedLocation, string $locationSignature): bool
 {
     $locationJson = json_encode($selectedLocation, JSON_UNESCAPED_SLASHES);
@@ -432,10 +441,48 @@ try {
     $weather = is_array($cached['weather'] ?? null) ? $cached['weather'] : null;
 
     $refreshing = false;
-    if (!$hasCache || $cacheStale) {
+    if (!$hasCache) {
+        // First-time load should fetch immediately so dashboard does not get stuck in refresh loop.
+        $direct = fetchWeatherForLocation($selectedLocation);
+        if (($direct['ok'] ?? false) === true) {
+            $cache = readWeatherCache($userId);
+            $cache[$selectedKey] = [
+                'location_signature' => $locationSignature,
+                'fetched_at' => time(),
+                'weather' => $direct,
+            ];
+            writeWeatherCache($userId, $cache);
+            $hasCache = true;
+            $cacheStale = false;
+            $cacheAgeSeconds = 0;
+            $weather = $direct;
+        } else {
+            $weather = is_array($direct) ? $direct : [
+                'ok' => false,
+                'error' => 'Unable to load weather data right now.',
+            ];
+        }
+    } elseif ($cacheStale) {
         if (!isRefreshInProgress($userId, $selectedKey)) {
             markRefreshInProgress($userId, $selectedKey);
             $refreshing = launchWeatherRefreshJob($userId, $selectedKey, $selectedLocation, $locationSignature);
+            if (!$refreshing) {
+                // If background launch fails (for example popen disabled), clear lock and refresh inline.
+                clearRefreshInProgress($userId, $selectedKey);
+                $direct = fetchWeatherForLocation($selectedLocation);
+                if (($direct['ok'] ?? false) === true) {
+                    $cache = readWeatherCache($userId);
+                    $cache[$selectedKey] = [
+                        'location_signature' => $locationSignature,
+                        'fetched_at' => time(),
+                        'weather' => $direct,
+                    ];
+                    writeWeatherCache($userId, $cache);
+                    $cacheStale = false;
+                    $cacheAgeSeconds = 0;
+                    $weather = $direct;
+                }
+            }
         } else {
             $refreshing = true;
         }

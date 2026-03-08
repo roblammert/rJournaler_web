@@ -1,0 +1,15 @@
+.git
+.gitignore
+.github
+.venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+storage/cache/weather/*.json
+storage/logs/*.log
+storage/ingest/*
+!storage/ingest/.gitkeep
+storage/exports/*
+!storage/exports/.gitkeep

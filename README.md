@@ -2,9 +2,9 @@
 
 Production-ready journaling web application using PHP + JavaScript + MySQL, with Python Optimus/Autobot background workers.
 
-Current release: `1.0.0`
+Current release: `1.0.1`
 
-## Highlights in 1.0.0
+## Highlights in 1.0.1
 
 - Secure auth stack: username/password, TOTP MFA, trusted devices, CSRF, audit logging.
 - End-to-end entry workflow: `AUTOSAVE -> WRITTEN -> FINISHED -> IN_PROCESS -> COMPLETE/FINAL/ERROR`.
@@ -54,7 +54,7 @@ cp .env.example .env
 ```
 
 2. Configure DB + app settings in `.env`.
-  - Set `APP_VERSION` (for UI version pill), e.g. `1.0.0`.
+  - Set `APP_VERSION` (for UI version pill), e.g. `1.0.1`.
 3. Run migrations.
 
 ```powershell
@@ -81,11 +81,144 @@ Linux/Docker:
 python3 python/worker/main.py
 ```
 
+## Docker (External MySQL)
+
+This repository includes a minimal Docker setup for:
+
+- `app` (PHP web server)
+- `worker` (Python Optimus/Autobot)
+
+No MySQL container is included. Use your existing external MySQL instance.
+
+1. Set external DB connection values in `.env`.
+  - If MySQL runs on the same machine as Docker engine: set `DB_HOST=host.docker.internal` (requires host-gateway support).
+  - If MySQL is remote: set `DB_HOST` to that hostname/IP.
+  - If Docker runs on a different machine, do not use `127.0.0.1` for DB unless MySQL is inside that same remote machine.
+2. Start containers.
+
+```powershell
+./scripts/docker.ps1 up
+```
+
+If Docker engine is remote, use either context or host:
+
+```powershell
+./scripts/docker.ps1 up -Context my-remote-context
+# or
+./scripts/docker.ps1 up -DockerHost tcp://remote-docker-host:2375
+```
+
+3. Run migrations.
+
+```powershell
+./scripts/docker.ps1 migrate
+```
+
+4. Open app:
+  - Local engine: `http://localhost:8080`
+  - Remote engine: `http://<remote-docker-host>:8080`
+
+5. Set `APP_URL` in `.env` to the externally reachable address (especially when engine is remote).
+
+Useful commands:
+
+```powershell
+./scripts/docker.ps1 logs
+./scripts/docker.ps1 logs -Service worker
+./scripts/docker.ps1 down
+```
+
+### Build On Docker Host From Transfer Package
+
+If your Docker engine is on a different machine, the simplest repeatable path is:
+
+1. Create a source package on your workstation:
+
+```powershell
+./scripts/package-for-transfer.ps1
+```
+
+Default mode is `working-tree` (includes tracked + untracked non-ignored files, including local changes).
+If you want committed-only packaging, use:
+
+```powershell
+./scripts/package-for-transfer.ps1 -Mode git-ref -Ref HEAD
+```
+
+2. Transfer package + checksum to Docker host, then verify.
+
+Windows Docker host (PowerShell):
+
+```powershell
+$pkg = "rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz"
+$expected = (Get-Content "$pkg.sha256").Split(' ')[0].Trim().ToLowerInvariant()
+$actual = (Get-FileHash -Algorithm SHA256 $pkg).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw "Checksum mismatch" }
+```
+
+Linux Docker host:
+
+```bash
+sha256sum -c rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz.sha256
+```
+
+3. Build images directly on Docker host.
+
+Windows Docker host (PowerShell):
+
+```powershell
+./scripts/build-images-from-package.ps1 -PackagePath .\rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz -Tag 1.0.1
+```
+
+The build scripts use `docker buildx build --load` so images are guaranteed to be available in the local Docker image store for compose runs.
+
+Linux Docker host:
+
+```bash
+./scripts/build-images-from-package.sh rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz 1.0.1
+```
+
+4. Run with image-based compose (no source bind mounts).
+
+Windows Docker host (PowerShell):
+
+```powershell
+$env:IMAGE_TAG = "1.0.1"
+docker compose -f docker-compose.images.yml up -d
+```
+
+The image-based compose file is configured with `pull_policy: never`, so it will only use locally built images and will not attempt registry pulls.
+
+Linux Docker host:
+
+```bash
+IMAGE_TAG=1.0.1 docker compose -f docker-compose.images.yml up -d
+```
+
+5. Run migrations against your external DB.
+
+Windows Docker host (PowerShell):
+
+```powershell
+$env:IMAGE_TAG = "1.0.1"
+docker compose -f docker-compose.images.yml run --rm app php scripts/migrate.php
+```
+
+Linux Docker host:
+
+```bash
+IMAGE_TAG=1.0.1 docker compose -f docker-compose.images.yml run --rm app php scripts/migrate.php
+```
+
 ## Cross-Platform Notes
 
 - Worker control APIs support Windows and Linux kill/restart behavior.
 - `scripts/weather-refresh.php` resolves Python executables for both `.venv/Scripts/python.exe` and `.venv/bin/python` with fallback.
 - Status dashboard helper commands are OS-aware and path-quoted for directories with spaces.
+
+## Installation Guide
+
+- `docs/INSTALLATION.md`
 
 ## Worker Pipeline
 

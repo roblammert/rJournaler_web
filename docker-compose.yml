@@ -1,0 +1,32 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: rjournaler_web_app
+    working_dir: /var/www/html
+    env_file:
+      - .env
+    volumes:
+      - ./:/var/www/html
+    ports:
+      - "8080:8080"
+    command: php -S 0.0.0.0:8080 -t public
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    container_name: rjournaler_web_worker
+    working_dir: /app
+    env_file:
+      - .env
+    volumes:
+      - ./:/app
+    command: python python/worker/main.py
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

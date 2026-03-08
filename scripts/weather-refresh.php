@@ -181,20 +181,69 @@ function fetchWeatherForLocation(array $location): array
 
     $command = escapeshellarg($pythonBin)
         . ' ' . escapeshellarg($scriptPath)
-        . ' --location-b64 ' . escapeshellarg($payloadB64)
-        . ' 2>&1';
+        . ' --location-b64 ' . escapeshellarg($payloadB64);
 
-    $output = [];
-    $exitCode = 0;
-    exec($command, $output, $exitCode);
+    $descriptorSpec = [
+        0 => ['pipe', 'r'],
+        1 => ['pipe', 'w'],
+        2 => ['pipe', 'w'],
+    ];
 
-    $raw = trim(implode("\n", $output));
+    $process = @proc_open($command, $descriptorSpec, $pipes, $projectRoot);
+    if (!is_resource($process)) {
+        return [
+            'ok' => false,
+            'error' => 'Unable to launch weather command process',
+        ];
+    }
+
+    fclose($pipes[0]);
+    stream_set_blocking($pipes[1], false);
+    stream_set_blocking($pipes[2], false);
+
+    $stdout = '';
+    $stderr = '';
+    $timeoutSeconds = 75;
+    $deadline = microtime(true) + $timeoutSeconds;
+
+    while (true) {
+        $stdout .= stream_get_contents($pipes[1]) ?: '';
+        $stderr .= stream_get_contents($pipes[2]) ?: '';
+
+        $status = proc_get_status($process);
+        if (!is_array($status) || ($status['running'] ?? false) !== true) {
+            break;
+        }
+
+        if (microtime(true) >= $deadline) {
+            @proc_terminate($process);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            @proc_close($process);
+            return [
+                'ok' => false,
+                'error' => 'Weather command timed out',
+                'timeout_seconds' => $timeoutSeconds,
+            ];
+        }
+
+        usleep(100000);
+    }
+
+    $stdout .= stream_get_contents($pipes[1]) ?: '';
+    $stderr .= stream_get_contents($pipes[2]) ?: '';
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $exitCode = proc_close($process);
+
+    $raw = trim($stdout !== '' ? $stdout : $stderr);
     $decoded = json_decode($raw, true);
     if (!is_array($decoded)) {
         return [
             'ok' => false,
             'error' => 'Weather command returned invalid JSON',
             'raw' => $raw,
+            'stderr' => trim($stderr),
             'exit_code' => $exitCode,
         ];
     }

@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.1] - 2026-03-08
+
+### Added
+- Added installation guide for Windows source to Windows Docker host deployment:
+	- `docs/INSTALLATION.md`
+
+### Changed
+- Updated release/documentation references from `1.0.0` to `1.0.1` across env/config/docs defaults.
+- Updated image-based compose and deployment scripts to default to tag `1.0.1`.
+- Updated README deployment examples and added explicit installation guide reference.
+
+### Fixed
+- Fixed Docker host deployment scripts to fail fast on Docker command errors instead of continuing after failures.
+- Fixed image deployment flow to avoid unexpected registry pulls (`pull_policy: never`, `--pull never`).
+- Fixed build/load behavior so packaged image builds are loaded into local Docker image store (`buildx --load`).
+- Fixed image-only app runtime issue where source files were not present in container images.
+- Fixed PHP container build/runtime for weather refresh by adding required Python runtime/venv support and Linux-compatible interpreter resolution.
+- Fixed weather refresh loop behavior for no-cache scenarios by prioritizing immediate fetch path and improving lock-timeout handling.
+
 ## [1.0.0] - 2026-03-08
 
 ### Added
