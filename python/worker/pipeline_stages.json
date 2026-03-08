@@ -1,0 +1,28 @@
+[
+  {
+    "id": "meta_group_0",
+    "label": "Meta Group 0",
+    "type": "db"
+  },
+  {
+    "id": "meta_group_1",
+    "label": "Meta Group 1",
+    "type": "db"
+  },
+  {
+    "id": "meta_group_2_llm",
+    "label": "Meta Group 2 (LLM)",
+    "type": "llm",
+    "prompt_file": "meta_group_2_prompt.txt"
+  },
+  {
+    "id": "meta_group_3_weather",
+    "label": "Meta Group 3 (Weather)",
+    "type": "db"
+  },
+  {
+    "id": "metrics_finalize",
+    "label": "Metrics Finalize",
+    "type": "db"
+  }
+]

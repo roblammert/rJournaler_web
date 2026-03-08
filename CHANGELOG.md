@@ -1,0 +1,63 @@
+# Changelog
+
+All notable changes to this project are documented in this file.
+
+## [1.0.0] - 2026-03-08
+
+### Added
+- Added full production application surface:
+	- Auth and session pages (`login`, `logout`, dashboard, user/admin settings)
+	- Entry editor workflow
+	- Analysis dashboards
+	- Queue/status monitoring dashboard
+	- Import review and admin reprocess workflows
+- Added secure auth stack with:
+	- Password hashing
+	- TOTP MFA (encrypted secret storage)
+	- Trusted device support
+	- CSRF protection and audit logging
+- Added entry UID model and migrations (`001` through `015`) including:
+	- UID-backed relational references
+	- Workflow/stage metadata
+	- import staging tables
+	- weather metadata tables
+	- orchestrator log storage
+	- retention index support
+- Added Optimus + Autobot runtime architecture:
+	- Config-driven stage pipeline (`python/worker/pipeline_stages.json`)
+	- Stage modules under `python/jobs/`
+	- Prompt-driven LLM stage processing
+	- Self-heal logic for stale jobs and worker state
+- Added observability and admin operations:
+	- Live log API/viewer (`public/api/optimus-logs.php`, `public/logviewer.php`)
+	- Queue summary cards and paging
+	- Admin worker controls (kill/restart/drain/reconcile)
+- Added weather integrations:
+	- NOAA/Open-Meteo weather ingestion support
+	- user weather preset management
+	- weather cache refresh/background script
+	- dashboard weather cards + 5-day forecast display
+- Added import tooling and pipeline helpers:
+	- Monthly ZIP parser and import batch workflows
+	- backfill and repair scripts
+	- UID repair script for historical timestamp correction
+- Added UI release version pill (`rJournaler_Web: v<major.minor.patch>`) across top-right header rows on interface pages.
+
+### Changed
+- Reworked worker runtime from basic single-loop behavior to orchestrated Optimus/Autobot multi-process execution in `python/worker/main.py`.
+- Expanded status dashboard UX for troubleshooting and operator actions, including command helpers and stage-aware queue detail.
+- Hardened admin reprocess flow with presets, dry-run preview, max-row controls, and batch queueing.
+- Updated scripts/docs to support both Windows development and Linux/Docker production operation patterns.
+- Moved deprecated correlation cleanup utility to legacy location:
+	- `scripts/legacy/cleanup-correlation-jobs.php`
+
+### Fixed
+- Fixed admin reprocess runtime failures across Apply Filters, Preview Selected, and Queue Selected operations.
+- Fixed SQL placeholder and malformed SQL issues in targeted reprocess queue actions.
+- Fixed dry-run behavior so preview mode does not execute write-path SQL preparation.
+- Added action-scoped error handling and improved failure visibility for admin reprocess actions.
+- Improved worker logging with explicit claim/requeue/failure events for faster production diagnostics.
+- Fixed cross-platform path handling in status helper commands for project paths containing spaces.
+
+### Removed
+- Removed Correlation Engine database objects via migration `017_remove_correlation_engine.sql`.

@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r python/requirements.txt
+
+      - name: PHP lint
+        run: |
+          find app public scripts config -name "*.php" -print0 | xargs -0 -n1 php -l
+
+      - name: Python compile check
+        run: python -m py_compile python/worker/main.py
+
+      - name: PHP smoke test
+        run: php tests/php/entry_uid_smoke_test.php
+
+      - name: Python unit tests
+        run: python -m unittest discover -s tests/python -p "test_*.py" -v
