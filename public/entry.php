@@ -14,7 +14,8 @@ use App\Security\Csrf;
 $userId = Auth::userId();
 $userTimeZone = Auth::timezonePreference() ?? date_default_timezone_get();
 $interfaceTheme = Auth::interfaceTheme();
-$appVersion = (string) ($config['version'] ?? '1.0.2');
+$appVersion = (string) ($config['version'] ?? '1.0.3');
+$appVersion = (string) ($config['version'] ?? '1.0.3');
 if (!is_int($userId)) {
     header('Location: /login.php');
     exit;

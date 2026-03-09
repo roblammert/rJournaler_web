@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.3] - 2026-03-09
+
+### Fixed
+- Restored all entry points and dashboards after blank page/deployment issues.
+- Updated all version references to 1.0.3 across PHP, configs, docs, and interface.
+- Verified baseline features and breakfixes for entry, dashboard, metadata, and workflow.
+
+### Changed
+- Interface pills and deployment instructions now reflect 1.0.3.
+- Docker compose and config files default to tag 1.0.3.
+- See `docs/releases/v1.0.3-release-notes.md` for full highlights and upgrade steps.
+
 ## [1.0.2] - 2026-03-09
 
 ### Changed
