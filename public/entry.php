@@ -14,7 +14,7 @@ use App\Security\Csrf;
 $userId = Auth::userId();
 $userTimeZone = Auth::timezonePreference() ?? date_default_timezone_get();
 $interfaceTheme = Auth::interfaceTheme();
-$appVersion = (string) ($config['version'] ?? '1.0.0');
+$appVersion = (string) ($config['version'] ?? '1.0.2');
 if (!is_int($userId)) {
     header('Location: /login.php');
     exit;
@@ -615,6 +615,7 @@ function renderListValues(mixed $value): string
             padding: 1rem;
             background: radial-gradient(circle at 18% 0%, var(--bg-accent), var(--bg) 38%);
             color: var(--text);
+            overflow-x: hidden;
         }
         h1, h2, h3 { color: var(--heading); }
         a { color: var(--link); text-decoration: none; }
@@ -653,6 +654,47 @@ function renderListValues(mixed $value): string
 
         .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1rem; }
         @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
+        @media (min-width: 961px) {
+            .layout { align-items: stretch; }
+            .layout > .panel { height: 100%; }
+            .layout > .panel:first-child {
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+            }
+            .sidebar {
+                height: 100%;
+                align-content: stretch;
+                grid-template-rows: auto 1fr;
+            }
+            .sidebar > .panel:last-child { height: 100%; }
+            .editor-block,
+            .editor-shell,
+            .editor-stats-row {
+                width: 100%;
+                max-width: none;
+                margin-left: 0;
+                margin-right: 0;
+            }
+            .editor-block {
+                flex: 1;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+            }
+            .editor-shell {
+                flex: 1;
+                min-height: 0;
+                display: grid;
+                grid-template-rows: auto minmax(0, 1fr);
+            }
+            .editor-surface {
+                height: auto;
+                min-height: 0;
+                max-height: none;
+                overflow-y: auto;
+            }
+        }
         .panel { border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; background: var(--surface); box-shadow: var(--shadow-sm); }
         .sidebar { display: grid; gap: 1rem; align-content: start; }
         input[type="text"], input[type="date"], textarea { width: 100%; box-sizing: border-box; margin-bottom: 0.5rem; }
@@ -684,21 +726,326 @@ function renderListValues(mixed $value): string
         .entry-header-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.55rem; }
         @media (max-width: 760px) { .entry-header-row { grid-template-columns: 1fr; } }
         .field-group label { display: block; }
-        .editor-shell { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .editor-block { max-width: 800px; margin: 0 auto; }
+        .editor-shell { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; max-width: 800px; margin: 0 auto; }
         .editor-toolbar { display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0.45rem; background: var(--surface-soft); border-bottom: 1px solid var(--border); }
         .editor-toolbar button { padding: 0.2rem 0.45rem; }
-        .editor-toolbar .toolbar-time-button { margin-left: auto; }
-        .editor-surface { min-height: 420px; padding: 0.65rem; background: var(--surface); overflow-wrap: break-word; word-break: normal; white-space: pre-wrap; cursor: text; user-select: text; -webkit-user-select: text; font-family: var(--font-mono); line-height: 1.45; }
+        .editor-toolbar .toolbar-time-button { margin-left: 0; }
+        .editor-toolbar .toolbar-mobile-only { display: none; }
+        .editor-toolbar .toolbar-heading-select {
+            display: none;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface);
+            color: var(--text);
+            padding: 0.2rem 0.35rem;
+            font-size: 0.82rem;
+            height: 1.95rem;
+        }
+        .editor-toolbar .toolbar-status {
+            display: none;
+            align-items: center;
+            margin-left: auto;
+            margin-right: auto;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            white-space: nowrap;
+            min-width: 4.6rem;
+            justify-content: center;
+            text-align: center;
+        }
+        .editor-toolbar .toolbar-status.ok { color: var(--ok); }
+        .editor-toolbar .toolbar-status.error { color: var(--danger); }
+        .editor-surface { min-height: 320px; max-height: 60vh; height: 40vh; padding: 0.65rem; background: var(--surface); overflow-y: auto; overflow-wrap: break-word; word-break: normal; white-space: pre-wrap; cursor: text; user-select: text; -webkit-user-select: text; font-family: var(--font-mono); line-height: 1.45; }
+
+        @media (max-width: 600px) {
+            .editor-shell { max-width: 98vw; margin: 0.5rem auto; }
+            .editor-surface { min-height: 180px; height: 32vh; max-height: 50vh; font-size: 1rem; }
+        }
         .editor-surface h1, .editor-surface h2, .editor-surface h3, .editor-surface h4, .editor-surface h5, .editor-surface h6 { margin: 0.35rem 0; }
         .editor-surface p { margin: 0.35rem 0; }
         .editor-surface ul, .editor-surface ol { margin: 0.35rem 0 0.35rem 1.2rem; }
         .editor-surface[contenteditable="false"] { background: var(--surface-soft); color: var(--text-muted); }
+        .editor-stats-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            max-width: 800px;
+            margin: 0.45rem auto 0.2rem;
+            padding-inline: 0.65rem;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            box-sizing: border-box;
+        }
+        .editor-stats-wordcount,
+        .editor-stats-goal,
+        .editor-stats-readtime {
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .editor-stats-wordcount { text-align: left; }
+        .editor-stats-goal { text-align: center; }
+        .editor-stats-readtime { text-align: right; }
+        #word-count,
+        #word-goal-status,
+        #read-time {
+            font-weight: 700;
+        }
+        @media (hover: none) and (pointer: coarse) {
+            .editor-stats-row { font-size: 0.82rem; }
+            .editor-toolbar .toolbar-mobile-only { display: inline-flex; }
+            .editor-toolbar .toolbar-status { display: inline-flex; }
+            #save-status { display: none; }
+            .editor-toolbar .toolbar-status {
+                font-size: 0.9rem;
+            }
+        }
+        @media (max-width: 600px) {
+            .editor-block,
+            .editor-shell,
+            .editor-stats-row {
+                max-width: 98vw;
+            }
+            .editor-toolbar button {
+                padding: 0.32rem 0.52rem;
+            }
+        }
+        html.editor-mobile-fullscreen,
+        body.editor-mobile-fullscreen {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+        @media (hover: none) and (pointer: coarse) {
+            body.editor-mobile-fullscreen .editor-block {
+                position: fixed;
+                inset: 0;
+                z-index: 2000;
+                width: 100vw;
+                max-width: 100vw;
+                margin: 0;
+                padding: 0;
+                background: var(--surface);
+                display: flex;
+                flex-direction: column;
+                --mobile-toolbar-height: 3.15rem;
+                --mobile-stats-height: 2.45rem;
+                height: var(--editor-mobile-fullscreen-height, 100svh);
+                min-height: var(--editor-mobile-fullscreen-height, 100svh);
+                max-height: var(--editor-mobile-fullscreen-height, 100svh);
+                overflow: hidden;
+                contain: strict;
+            }
+            body.editor-mobile-fullscreen .editor-block > label {
+                display: none;
+            }
+            body.editor-mobile-fullscreen .editor-shell {
+                max-width: none;
+                margin: 0;
+                flex: 1;
+                display: grid;
+                grid-template-rows: var(--mobile-toolbar-height) minmax(0, 1fr);
+                border-radius: 0;
+                border-left: 0;
+                border-right: 0;
+            }
+            body.editor-mobile-fullscreen .editor-toolbar,
+            body.editor-mobile-fullscreen .editor-stats-row {
+                flex-shrink: 0;
+            }
+            body.editor-mobile-fullscreen .editor-toolbar {
+                height: var(--mobile-toolbar-height);
+                min-height: var(--mobile-toolbar-height);
+                max-height: var(--mobile-toolbar-height);
+                box-sizing: border-box;
+                flex-wrap: nowrap;
+                align-items: center;
+                align-content: center;
+                overflow-x: auto;
+                overflow-y: hidden;
+                -webkit-overflow-scrolling: touch;
+                contain: layout paint;
+            }
+            body.editor-mobile-fullscreen .editor-toolbar button {
+                flex: 0 0 auto;
+            }
+            body.editor-mobile-fullscreen .editor-toolbar .toolbar-status {
+                flex: 0 0 5.2rem;
+                width: 5.2rem;
+                min-width: 5.2rem;
+                max-width: 5.2rem;
+            }
+            body.editor-mobile-fullscreen .editor-surface {
+                height: auto;
+                max-height: none;
+                min-height: 0;
+                flex: 1;
+                overflow-y: scroll;
+                overflow-x: hidden;
+                scrollbar-gutter: stable both-edges;
+                overscroll-behavior: contain;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+                contain: layout paint;
+            }
+            body.editor-mobile-fullscreen .editor-stats-row {
+                max-width: none;
+                margin: 0;
+                padding: 0.55rem 0.65rem;
+                background: var(--surface-soft);
+                border-top: 1px solid var(--border);
+                height: var(--mobile-stats-height);
+                min-height: var(--mobile-stats-height);
+                max-height: var(--mobile-stats-height);
+                box-sizing: border-box;
+                white-space: nowrap;
+                overflow: hidden;
+                align-items: center;
+                contain: layout paint;
+            }
+        }
+        @media (hover: none) and (pointer: coarse) and (orientation: portrait) {
+            body {
+                padding: 0.55rem;
+            }
+            .panel {
+                padding: 0.55rem;
+            }
+            .layout,
+            .editor-block,
+            .editor-shell,
+            .editor-stats-row {
+                width: 100%;
+                max-width: 100%;
+            }
+            .editor-toolbar {
+                gap: 0.25rem;
+                padding: 0.35rem;
+                min-height: 4.6rem;
+                align-content: start;
+            }
+            body.editor-mobile-fullscreen .editor-toolbar {
+                min-height: var(--mobile-toolbar-height);
+                align-content: center;
+            }
+            body.editor-mobile-fullscreen .editor-toolbar button[data-cmd="insertUnorderedList"],
+            body.editor-mobile-fullscreen .editor-toolbar button[data-cmd="insertOrderedList"] {
+                display: none;
+            }
+            .editor-toolbar button {
+                padding: 0.26rem 0.4rem;
+                font-size: 0.82rem;
+            }
+            .editor-toolbar .toolbar-heading-button {
+                display: none;
+            }
+            .editor-toolbar .toolbar-heading-select {
+                display: inline-block;
+            }
+            .editor-toolbar .toolbar-status {
+                min-width: 5.2rem;
+                font-size: 0.95rem;
+            }
+            .editor-stats-row {
+                gap: 0.3rem;
+                padding-inline: 0.45rem;
+                font-size: 0.76rem;
+            }
+        }
+        @media (min-width: 961px) {
+            .layout {
+                align-items: start;
+                height: auto;
+                min-height: 0;
+            }
+            .layout > .panel {
+                height: auto;
+                min-height: 0;
+            }
+            .layout > .panel:first-child {
+                display: block;
+                overflow: visible;
+            }
+            .sidebar {
+                height: auto;
+                align-content: start;
+                grid-template-rows: none;
+                min-height: 0;
+            }
+            .sidebar > .panel:last-child {
+                height: auto;
+                min-height: 0;
+            }
+            .editor-block,
+            .editor-shell,
+            .editor-stats-row {
+                width: 100%;
+                max-width: none;
+                margin-left: 0;
+                margin-right: 0;
+            }
+            .editor-block {
+                flex: none;
+                min-height: 0;
+                display: block;
+            }
+            .editor-shell {
+                height: var(--desktop-editor-shell-height, auto);
+                min-height: var(--desktop-editor-shell-height, auto);
+                max-height: var(--desktop-editor-shell-height, auto);
+                display: grid;
+                grid-template-rows: auto minmax(0, 1fr);
+            }
+            .editor-surface {
+                height: auto;
+                min-height: 0;
+                max-height: none;
+                overflow-y: auto;
+            }
+        }
         .muted { color: var(--text-muted); }
         .error { color: var(--danger); }
         .ok { color: var(--ok); }
         ul { padding-left: 1rem; }
         li { margin-bottom: 0.25rem; }
         .meta-shell { border: 1px solid var(--meta-shell-border); border-radius: 10px; background: var(--meta-shell-bg); padding: 0.6rem; }
+        .meta-fold {
+            margin: 0.75rem 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .meta-fold[hidden] { display: none; }
+        .meta-fold-summary {
+            cursor: pointer;
+            font-weight: 700;
+            list-style: none;
+            padding: 0.55rem 0.65rem;
+            user-select: none;
+            border-bottom: 1px solid var(--border);
+            color: var(--heading);
+            background: var(--surface-soft);
+        }
+        .meta-fold-summary::-webkit-details-marker { display: none; }
+        .meta-fold-summary::before {
+            content: '▸';
+            display: inline-block;
+            margin-right: 0.45rem;
+            transition: transform 0.15s ease;
+        }
+        .meta-fold[open] .meta-fold-summary::before {
+            transform: rotate(90deg);
+        }
+        .meta-fold .meta-shell {
+            border: 0;
+            border-radius: 0;
+            background: transparent;
+            padding: 0.6rem;
+        }
         .meta-header { margin: 0 0 0.5rem; font-size: 1rem; }
         .meta-tabs { display: flex; gap: 0.4rem; margin-bottom: 0.55rem; flex-wrap: wrap; }
         .meta-tab { border: 1px solid var(--meta-tab-border); background: var(--meta-tab-bg); color: var(--meta-tab-text); padding: 0.25rem 0.6rem; border-radius: 999px; cursor: pointer; }
@@ -800,29 +1147,46 @@ function renderListValues(mixed $value): string
                 </div>
             </div>
 
-            <label for="entry-content-editor">Content</label>
-            <div class="editor-shell">
+            <div id="editor-block" class="editor-block">
+                <label for="entry-content-editor">Content</label>
+                <div class="editor-shell">
                 <div class="editor-toolbar" id="editor-toolbar">
                     <button type="button" data-editor-action data-cmd="bold"><strong>B</strong></button>
                     <button type="button" data-editor-action data-cmd="italic"><em>I</em></button>
                     <button type="button" data-editor-action data-cmd="underline"><u>U</u></button>
                     <button type="button" data-editor-action data-cmd="strikeThrough"><s>S</s></button>
-                    <button type="button" data-editor-action data-block="h1">H1</button>
-                    <button type="button" data-editor-action data-block="h2">H2</button>
-                    <button type="button" data-editor-action data-block="h3">H3</button>
-                    <button type="button" data-editor-action data-block="h4">H4</button>
-                    <button type="button" data-editor-action data-block="h5">H5</button>
-                    <button type="button" data-editor-action data-block="p">P</button>
+                    <button type="button" class="toolbar-heading-button" data-editor-action data-block="h1">H1</button>
+                    <button type="button" class="toolbar-heading-button" data-editor-action data-block="h2">H2</button>
+                    <button type="button" class="toolbar-heading-button" data-editor-action data-block="h3">H3</button>
+                    <button type="button" class="toolbar-heading-button" data-editor-action data-block="h4">H4</button>
+                    <button type="button" class="toolbar-heading-button" data-editor-action data-block="h5">H5</button>
+                    <select id="editor-heading-select" class="toolbar-heading-select" aria-label="Choose heading level">
+                        <option value="">Head</option>
+                        <option value="h1">H1</option>
+                        <option value="h2">H2</option>
+                        <option value="h3">H3</option>
+                        <option value="h4">H4</option>
+                        <option value="h5">H5</option>
+                    </select>
                     <button type="button" data-editor-action data-cmd="insertUnorderedList">UL</button>
                     <button type="button" data-editor-action data-cmd="insertOrderedList">OL</button>
+                    <span id="save-status-mobile" class="toolbar-status" aria-live="polite"></span>
+                    <button type="button" class="toolbar-mobile-only" data-editor-action data-custom="toggle-mobile-fullscreen" title="Toggle fullscreen editor">FS</button>
                     <button type="button" class="toolbar-time-button" data-editor-action data-custom="insert-time-heading" title="Insert current time">&#128339;</button>
                 </div>
                 <div id="entry-content-editor" class="editor-surface" contenteditable="true" aria-label="Entry content editor"></div>
             </div>
+            <div class="editor-stats-row" aria-live="polite">
+                <span class="editor-stats-wordcount"><span id="word-count-label">Word count:</span> <span id="word-count">0</span></span>
+                <span class="editor-stats-goal"><span id="word-goal-label">Daily Goal:</span> <span id="word-goal-status" class="goal-status pending">500 words to go!</span></span>
+                <span class="editor-stats-readtime"><span id="read-time-label">Estimated read time:</span> <span id="read-time">0</span> min</span>
+            </div>
+            </div>
             <textarea id="entry-content" hidden><?php echo htmlspecialchars((string) ($entry['content_raw'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></textarea>
 
-            <section id="meta-groups-panel" class="panel meta-shell" style="margin:0.75rem 0;" <?php echo strtoupper((string) ($entry['workflow_stage'] ?? '')) === 'COMPLETE' ? '' : 'hidden'; ?>>
-                <h3 class="meta-header">Processed Metadata</h3>
+            <details id="meta-groups-fold" class="panel meta-fold" <?php echo strtoupper((string) ($entry['workflow_stage'] ?? '')) === 'COMPLETE' ? '' : 'hidden'; ?>>
+                <summary class="meta-fold-summary">Processed Metadata</summary>
+                <section id="meta-groups-panel" class="meta-shell">
                 <p class="muted" style="margin:0 0 0.5rem;">Available only for entries in <strong>COMPLETE</strong> stage.</p>
                 <div class="meta-tabs" role="tablist" aria-label="Metadata groups">
                     <button class="meta-tab active" type="button" role="tab" aria-selected="true" data-tab="group0">Meta Group 0</button>
@@ -1048,7 +1412,8 @@ function renderListValues(mixed $value): string
                         <p class="muted">Meta Group 3 weather data is not available yet.</p>
                     <?php endif; ?>
                 </section>
-            </section>
+                </section>
+            </details>
 
             <p id="save-status" class="muted"></p>
         </section>
@@ -1057,9 +1422,6 @@ function renderListValues(mixed $value): string
             <section class="panel">
                 <h2>Entry Controls</h2>
                 <p class="stat-line">Current stage: <strong id="workflow-stage"><?php echo htmlspecialchars((string) ($entry['workflow_stage'] ?? 'AUTOSAVE'), ENT_QUOTES, 'UTF-8'); ?></strong></p>
-                <p class="stat-line">Word count: <span id="word-count">0</span></p>
-                <p class="stat-line">Word Goal: <span id="word-goal-status" class="goal-status pending">500 words to go!</span></p>
-                <p class="stat-line">Estimated read time: <span id="read-time">0</span> min</p>
 
                 <div class="action-stack">
                     <button id="save-button" type="button">Save Entry</button>
@@ -1210,12 +1572,23 @@ function renderListValues(mixed $value): string
         const entryUidInput = document.getElementById('entry-uid');
         const csrfTokenInput = document.getElementById('csrf-token');
         const wordCount = document.getElementById('word-count');
+        const wordCountLabel = document.getElementById('word-count-label');
         const wordGoalStatus = document.getElementById('word-goal-status');
+        const wordGoalLabel = document.getElementById('word-goal-label');
         const readTime = document.getElementById('read-time');
+        const readTimeLabel = document.getElementById('read-time-label');
+        const editorBlock = document.getElementById('editor-block');
+        const editorShell = editorBlock ? editorBlock.querySelector('.editor-shell') : null;
+        const editorStatsRow = editorBlock ? editorBlock.querySelector('.editor-stats-row') : null;
         const editorSurface = document.getElementById('entry-content-editor');
         const editorToolbar = document.getElementById('editor-toolbar');
+        const editorHeadingSelect = document.getElementById('editor-heading-select');
+        const mobileFullscreenButton = editorToolbar
+            ? editorToolbar.querySelector('button[data-custom="toggle-mobile-fullscreen"]')
+            : null;
         const workflowStage = document.getElementById('workflow-stage');
         const saveStatus = document.getElementById('save-status');
+        const saveStatusMobile = document.getElementById('save-status-mobile');
         const finishButton = document.getElementById('finish-button');
         const reprocessButton = document.getElementById('reprocess-button');
         const unlockButton = document.getElementById('unlock-button');
@@ -1223,6 +1596,8 @@ function renderListValues(mixed $value): string
         const deleteButton = document.getElementById('delete-button');
         const timelineLink = document.getElementById('timeline-link');
         const metaPanel = document.getElementById('meta-groups-panel');
+        const metaFold = document.getElementById('meta-groups-fold');
+        const metaFoldSummary = metaFold ? metaFold.querySelector('.meta-fold-summary') : null;
         const reprocessModal = document.getElementById('reprocess-modal');
         const reprocessModalForm = document.getElementById('reprocess-modal-form');
         const reprocessModalCancel = document.getElementById('reprocess-modal-cancel');
@@ -1238,6 +1613,18 @@ function renderListValues(mixed $value): string
         let saveInFlight = false;
         let currentStage = String((initialEntry && initialEntry.workflow_stage) || 'AUTOSAVE');
         let isBodyLocked = Number((initialEntry && initialEntry.body_locked) || 0) === 1;
+        let lastPortraitMobile = false;
+
+        function setSaveStatus(message, tone, mobileMessage) {
+            if (saveStatus) {
+                saveStatus.textContent = String(message || '');
+                saveStatus.className = String(tone || 'muted');
+            }
+            if (saveStatusMobile) {
+                saveStatusMobile.textContent = String(mobileMessage || '');
+                saveStatusMobile.className = 'toolbar-status ' + String(tone || 'muted');
+            }
+        }
 
         function openReprocessModal() {
             if (!reprocessModal || !reprocessModalForm) {
@@ -1320,22 +1707,106 @@ function renderListValues(mixed $value): string
         function computeStats(text) {
             const words = text.trim() === '' ? [] : text.trim().split(/\s+/);
             const count = words.length;
-            wordCount.textContent = String(count);
             const minutes = count === 0 ? 0 : Math.max(0.1, Math.round((count / 200) * 10) / 10);
-            readTime.textContent = String(minutes);
-
-            if (wordGoalStatus) {
-                if (count >= 500) {
-                    wordGoalStatus.textContent = 'Daily Goal Met!';
-                    wordGoalStatus.classList.remove('pending');
-                    wordGoalStatus.classList.add('met');
-                } else {
-                    const wordsRemaining = 500 - count;
-                    wordGoalStatus.textContent = String(wordsRemaining) + ' words to go!';
-                    wordGoalStatus.classList.remove('met');
-                    wordGoalStatus.classList.add('pending');
-                }
+            const remaining = Math.max(0, 500 - count);
+            const portraitMobile = isPortraitMobileViewport();
+            if (count >= 500) {
+                updateWordStats(count, portraitMobile ? 'Met' : 'Daily Goal Met!', minutes, true);
+            } else {
+                updateWordStats(count, portraitMobile ? (String(remaining) + ' More') : (String(remaining) + ' words to go!'), minutes, false);
             }
+        }
+
+        function updateWordStats(count, goalStatus, readMinutes, goalMet) {
+            if (wordCount) wordCount.textContent = String(count);
+            if (wordGoalStatus) {
+                wordGoalStatus.textContent = goalStatus;
+                wordGoalStatus.classList.toggle('met', goalMet === true);
+                wordGoalStatus.classList.toggle('pending', goalMet !== true);
+            }
+            if (readTime) readTime.textContent = String(readMinutes);
+        }
+
+        function isMobileViewport() {
+            return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+        }
+
+        function isPortraitMobileViewport() {
+            return isMobileViewport() && window.matchMedia('(orientation: portrait)').matches;
+        }
+
+        function refreshStatsLabels() {
+            const portraitMobile = isPortraitMobileViewport();
+            if (wordCountLabel) {
+                wordCountLabel.textContent = portraitMobile ? 'WC:' : 'Word count:';
+            }
+            if (wordGoalLabel) {
+                wordGoalLabel.textContent = portraitMobile ? 'Goal:' : 'Daily Goal:';
+            }
+            if (readTimeLabel) {
+                readTimeLabel.textContent = portraitMobile ? 'Read Time:' : 'Estimated read time:';
+            }
+        }
+
+        function refreshMobileFullscreenButton() {
+            if (!(mobileFullscreenButton instanceof HTMLButtonElement)) {
+                return;
+            }
+            const isFullscreen = document.body.classList.contains('editor-mobile-fullscreen');
+            mobileFullscreenButton.textContent = isFullscreen ? 'Exit' : 'FS';
+            mobileFullscreenButton.title = isFullscreen ? 'Exit fullscreen editor' : 'Toggle fullscreen editor';
+        }
+
+        function toggleMobileFullscreen() {
+            if (!editorBlock || !isMobileViewport()) {
+                return;
+            }
+            document.body.classList.toggle('editor-mobile-fullscreen');
+            if (document.documentElement) {
+                document.documentElement.classList.toggle('editor-mobile-fullscreen', document.body.classList.contains('editor-mobile-fullscreen'));
+            }
+            lockFullscreenViewportHeight();
+            refreshMobileFullscreenButton();
+        }
+
+        function lockFullscreenViewportHeight() {
+            if (!document.documentElement) {
+                return;
+            }
+            if (document.body.classList.contains('editor-mobile-fullscreen')) {
+                const viewportHeight = window.visualViewport && Number.isFinite(window.visualViewport.height)
+                    ? window.visualViewport.height
+                    : window.innerHeight;
+                document.documentElement.style.setProperty('--editor-mobile-fullscreen-height', String(Math.round(viewportHeight)) + 'px');
+            } else {
+                document.documentElement.style.removeProperty('--editor-mobile-fullscreen-height');
+                document.documentElement.classList.remove('editor-mobile-fullscreen');
+            }
+        }
+
+        function lockDesktopEditorHeight() {
+            if (!(editorShell instanceof HTMLElement)) {
+                return;
+            }
+            const desktopViewport = window.matchMedia('(min-width: 961px)').matches;
+            if (!desktopViewport || isMobileViewport()) {
+                document.documentElement.style.removeProperty('--desktop-editor-shell-height');
+                return;
+            }
+
+            const shellTop = editorShell.getBoundingClientRect().top;
+            const statsHeight = editorStatsRow instanceof HTMLElement
+                ? editorStatsRow.getBoundingClientRect().height
+                : 0;
+            const metadataSummaryHeight = (metaFold instanceof HTMLElement
+                && metaFoldSummary instanceof HTMLElement
+                && !metaFold.hidden)
+                ? metaFoldSummary.getBoundingClientRect().height
+                : 0;
+            const viewportPadding = 18;
+            const available = Math.floor(window.innerHeight - shellTop - statsHeight - metadataSummaryHeight - viewportPadding);
+            const shellHeight = Math.max(320, available);
+            document.documentElement.style.setProperty('--desktop-editor-shell-height', String(shellHeight) + 'px');
         }
 
         function payload() {
@@ -1603,7 +2074,13 @@ function renderListValues(mixed $value): string
             unlockButton.disabled = entryUidInput.value === '' || !lockHeaderFields;
             finalizeButton.disabled = entryUidInput.value === '' || upperStage !== 'COMPLETE';
             deleteButton.disabled = entryUidInput.value === '' || !(upperStage === 'AUTOSAVE' || upperStage === 'WRITTEN');
-            if (metaPanel) {
+            if (metaFold) {
+                const showMetadata = upperStage === 'COMPLETE';
+                metaFold.hidden = !showMetadata;
+                if (!showMetadata) {
+                    metaFold.open = false;
+                }
+            } else if (metaPanel) {
                 metaPanel.hidden = upperStage !== 'COMPLETE';
             }
         }
@@ -1616,7 +2093,7 @@ function renderListValues(mixed $value): string
                 return;
             }
             syncMarkdownFromEditor();
-            saveStatus.textContent = 'Saving draft...';
+            setSaveStatus('Saving draft...', 'muted', 'Saving');
             try {
                 const response = await fetch('/api/entry-autosave.php', {
                     method: 'POST',
@@ -1643,19 +2120,16 @@ function renderListValues(mixed $value): string
                 }
                 refreshStageUi();
 
-                saveStatus.textContent = 'Draft autosaved';
-                saveStatus.className = 'ok';
+                setSaveStatus('Draft autosaved', 'ok', 'Saved');
             } catch (_error) {
-                saveStatus.textContent = 'Autosave error';
-                saveStatus.className = 'error';
+                setSaveStatus('Autosave error', 'error', 'Error');
             }
         }
 
         async function saveEntry() {
             saveInFlight = true;
             normalizeEditorContentForPersist();
-            saveStatus.textContent = 'Saving entry...';
-            saveStatus.className = 'muted';
+            setSaveStatus('Saving entry...', 'muted', 'Saving');
 
             try {
                 const response = await fetch('/api/entry-save.php', {
@@ -1674,14 +2148,11 @@ function renderListValues(mixed $value): string
                     currentStage = data.stage;
                 }
                 history.replaceState({}, '', '/entry.php?uid=' + encodeURIComponent(entryUidInput.value));
-                updateTimelineLink();
                 computeStats(textarea.value);
                 refreshStageUi();
-                saveStatus.textContent = 'Saved';
-                saveStatus.className = 'ok';
+                setSaveStatus('Saved', 'ok', 'Saved');
             } catch (error) {
-                saveStatus.textContent = error instanceof Error ? error.message : 'Save failed';
-                saveStatus.className = 'error';
+                setSaveStatus(error instanceof Error ? error.message : 'Save failed', 'error', 'Error');
             } finally {
                 saveInFlight = false;
             }
@@ -1696,13 +2167,11 @@ function renderListValues(mixed $value): string
             }
 
             if (entryUidInput.value === '') {
-                saveStatus.textContent = 'Save entry first';
-                saveStatus.className = 'error';
+                setSaveStatus('Save entry first', 'error', 'Error');
                 return;
             }
 
-            saveStatus.textContent = 'Updating stage...';
-            saveStatus.className = 'muted';
+            setSaveStatus('Updating stage...', 'muted', 'Working');
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
@@ -1729,18 +2198,15 @@ function renderListValues(mixed $value): string
                     isBodyLocked = false;
                 }
                 refreshStageUi();
-                saveStatus.textContent = successMessage;
-                saveStatus.className = 'ok';
+                setSaveStatus(successMessage, 'ok', 'Updated');
             } catch (error) {
-                saveStatus.textContent = error instanceof Error ? error.message : 'Stage update failed';
-                saveStatus.className = 'error';
+                setSaveStatus(error instanceof Error ? error.message : 'Stage update failed', 'error', 'Error');
             }
         }
 
         async function callReprocessAction() {
             if (entryUidInput.value === '') {
-                saveStatus.textContent = 'Save entry first';
-                saveStatus.className = 'error';
+                setSaveStatus('Save entry first', 'error', 'Error');
                 return;
             }
 
@@ -1749,8 +2215,7 @@ function renderListValues(mixed $value): string
                 return;
             }
 
-            saveStatus.textContent = 'Updating stage...';
-            saveStatus.className = 'muted';
+            setSaveStatus('Updating stage...', 'muted', 'Working');
             try {
                 const response = await fetch('/api/entry-reprocess.php', {
                     method: 'POST',
@@ -1770,11 +2235,9 @@ function renderListValues(mixed $value): string
                 }
                 isBodyLocked = false;
                 refreshStageUi();
-                saveStatus.textContent = 'Entry reopened and queued for reprocessing';
-                saveStatus.className = 'ok';
+                setSaveStatus('Entry reopened and queued for reprocessing', 'ok', 'Updated');
             } catch (error) {
-                saveStatus.textContent = error instanceof Error ? error.message : 'Stage update failed';
-                saveStatus.className = 'error';
+                setSaveStatus(error instanceof Error ? error.message : 'Stage update failed', 'error', 'Error');
             }
         }
 
@@ -1787,8 +2250,7 @@ function renderListValues(mixed $value): string
                 return;
             }
 
-            saveStatus.textContent = 'Deleting entry...';
-            saveStatus.className = 'muted';
+            setSaveStatus('Deleting entry...', 'muted', 'Working');
             try {
                 const response = await fetch('/api/entry-delete.php', {
                     method: 'POST',
@@ -1814,11 +2276,9 @@ function renderListValues(mixed $value): string
                 computeStats('');
                 updateTimelineLink();
                 refreshStageUi();
-                saveStatus.textContent = 'Entry deleted';
-                saveStatus.className = 'ok';
+                setSaveStatus('Entry deleted', 'ok', 'Deleted');
             } catch (error) {
-                saveStatus.textContent = error instanceof Error ? error.message : 'Delete failed';
-                saveStatus.className = 'error';
+                setSaveStatus(error instanceof Error ? error.message : 'Delete failed', 'error', 'Error');
             }
         }
 
@@ -1877,6 +2337,40 @@ function renderListValues(mixed $value): string
         unlockButton.addEventListener('click', () => callStageAction('/api/entry-unlock.php', 'Entry unlocked and stage set to WRITTEN'));
         finalizeButton.addEventListener('click', () => callStageAction('/api/entry-finalize.php', 'Entry marked as final'));
         deleteButton.addEventListener('click', deleteEntry);
+        window.addEventListener('resize', () => {
+            const portraitNow = isPortraitMobileViewport();
+            const orientationChanged = portraitNow !== lastPortraitMobile;
+
+            if (!isMobileViewport() && document.body.classList.contains('editor-mobile-fullscreen')) {
+                document.body.classList.remove('editor-mobile-fullscreen');
+                if (document.documentElement) {
+                    document.documentElement.classList.remove('editor-mobile-fullscreen');
+                }
+            }
+
+            if (document.body.classList.contains('editor-mobile-fullscreen')) {
+                lockFullscreenViewportHeight();
+            }
+
+            if (orientationChanged) {
+                lastPortraitMobile = portraitNow;
+                refreshStatsLabels();
+                computeStats(textarea.value);
+                lockFullscreenViewportHeight();
+            }
+
+            lockDesktopEditorHeight();
+
+            refreshMobileFullscreenButton();
+        });
+
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                if (document.body.classList.contains('editor-mobile-fullscreen')) {
+                    lockFullscreenViewportHeight();
+                }
+            });
+        }
 
         if (editorToolbar) {
             editorToolbar.addEventListener('click', (event) => {
@@ -1897,6 +2391,10 @@ function renderListValues(mixed $value): string
                     appendLocalTimeHeading();
                     return;
                 }
+                if (custom === 'toggle-mobile-fullscreen') {
+                    toggleMobileFullscreen();
+                    return;
+                }
 
                 const cmd = button.getAttribute('data-cmd');
                 const block = button.getAttribute('data-block');
@@ -1908,6 +2406,21 @@ function renderListValues(mixed $value): string
                 } else if (block) {
                     document.execCommand('formatBlock', false, '<' + block + '>');
                 }
+                scheduleAutosave();
+            });
+        }
+
+        if (editorHeadingSelect instanceof HTMLSelectElement) {
+            editorHeadingSelect.addEventListener('change', () => {
+                const block = String(editorHeadingSelect.value || '').trim();
+                if (block === '') {
+                    return;
+                }
+                if (editorSurface) {
+                    editorSurface.focus();
+                }
+                document.execCommand('formatBlock', false, '<' + block + '>');
+                editorHeadingSelect.value = '';
                 scheduleAutosave();
             });
         }
@@ -1938,8 +2451,13 @@ function renderListValues(mixed $value): string
         }
 
         computeStats(textarea.value);
+        refreshStatsLabels();
         updateTimelineLink();
         refreshStageUi();
+        lastPortraitMobile = isPortraitMobileViewport();
+        lockFullscreenViewportHeight();
+        lockDesktopEditorHeight();
+        refreshMobileFullscreenButton();
     </script>
 </body>
 </html>

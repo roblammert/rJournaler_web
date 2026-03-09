@@ -91,7 +91,7 @@ if ($actual -ne $expected) { throw "Checksum mismatch" }
 Use the one-command deploy script:
 
 ```powershell
-.\rjournaler_web-src-YYYYMMDD-HHMMSS\scripts\deploy-images.ps1 -PackagePath .\rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz -Tag 1.0.1
+.\rjournaler_web-src-YYYYMMDD-HHMMSS\scripts\deploy-images.ps1 -PackagePath .\rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz -Tag 1.0.2
 ```
 
 What this does:
@@ -104,7 +104,7 @@ What this does:
 ## 6. Confirm Running Services
 
 ```powershell
-$env:IMAGE_TAG = "1.0.1"
+$env:IMAGE_TAG = "1.0.2"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml ps
 ```
 
@@ -117,21 +117,21 @@ Open app:
 Tail logs:
 
 ```powershell
-$env:IMAGE_TAG = "1.0.1"
+$env:IMAGE_TAG = "1.0.2"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml logs -f app worker
 ```
 
 Re-run migrations:
 
 ```powershell
-$env:IMAGE_TAG = "1.0.1"
+$env:IMAGE_TAG = "1.0.2"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml run --rm app php scripts/migrate.php
 ```
 
 Stop/remove containers:
 
 ```powershell
-$env:IMAGE_TAG = "1.0.1"
+$env:IMAGE_TAG = "1.0.2"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml down
 ```
 

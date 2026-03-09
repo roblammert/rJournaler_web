@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.2] - 2026-03-09
+
+### Changed
+- Editor layout and UX overhaul for mobile and desktop:
+  - Responsive editor region with stable desktop sizing and foldable metadata panel.
+  - Mobile fullscreen mode with viewport lock, toolbar compaction, and stats row placement.
+  - Portrait mode label abbreviations and heading dropdown.
+  - Metadata panel only visible for entries in COMPLETE stage.
+- Updated all documentation and deployment defaults to version 1.0.2.
+
+### Fixed
+- Eliminated editor reflow/jitter in fullscreen and desktop modes.
+- Fixed duplicate editor node and toolbar button issues.
+- Hardened mobile/desktop mode switching and stats alignment.
+
+### Deployment
+- All Docker compose and config files now default to tag 1.0.2.
+- See `docs/releases/v1.0.2-release-notes.md` for full highlights and upgrade steps.
+
 ## [1.0.1] - 2026-03-08
 
 ### Added

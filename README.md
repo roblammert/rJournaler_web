@@ -2,9 +2,15 @@
 
 Production-ready journaling web application using PHP + JavaScript + MySQL, with Python Optimus/Autobot background workers.
 
-Current release: `1.0.1`
+Current release: `1.0.2`
 
-## Highlights in 1.0.1
+## Highlights in 1.0.2
+
+- Editor UX upgrade for desktop and mobile:
+  - responsive markdown editor sizing and scroll behavior
+  - mobile fullscreen editing with stable top/bottom bars
+  - portrait-focused toolbar compaction and heading selector
+  - processed metadata foldout panel under editor stats on desktop
 
 - Secure auth stack: username/password, TOTP MFA, trusted devices, CSRF, audit logging.
 - End-to-end entry workflow: `AUTOSAVE -> WRITTEN -> FINISHED -> IN_PROCESS -> COMPLETE/FINAL/ERROR`.
@@ -54,7 +60,7 @@ cp .env.example .env
 ```
 
 2. Configure DB + app settings in `.env`.
-  - Set `APP_VERSION` (for UI version pill), e.g. `1.0.1`.
+  - Set `APP_VERSION` (for UI version pill), e.g. `1.0.2`.
 3. Run migrations.
 
 ```powershell
@@ -167,7 +173,7 @@ sha256sum -c rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz.sha256
 Windows Docker host (PowerShell):
 
 ```powershell
-./scripts/build-images-from-package.ps1 -PackagePath .\rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz -Tag 1.0.1
+./scripts/build-images-from-package.ps1 -PackagePath .\rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz -Tag 1.0.2
 ```
 
 The build scripts use `docker buildx build --load` so images are guaranteed to be available in the local Docker image store for compose runs.
@@ -175,7 +181,7 @@ The build scripts use `docker buildx build --load` so images are guaranteed to b
 Linux Docker host:
 
 ```bash
-./scripts/build-images-from-package.sh rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz 1.0.1
+./scripts/build-images-from-package.sh rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz 1.0.2
 ```
 
 4. Run with image-based compose (no source bind mounts).
@@ -183,7 +189,7 @@ Linux Docker host:
 Windows Docker host (PowerShell):
 
 ```powershell
-$env:IMAGE_TAG = "1.0.1"
+$env:IMAGE_TAG = "1.0.2"
 docker compose -f docker-compose.images.yml up -d
 ```
 
@@ -192,7 +198,7 @@ The image-based compose file is configured with `pull_policy: never`, so it will
 Linux Docker host:
 
 ```bash
-IMAGE_TAG=1.0.1 docker compose -f docker-compose.images.yml up -d
+IMAGE_TAG=1.0.2 docker compose -f docker-compose.images.yml up -d
 ```
 
 5. Run migrations against your external DB.
@@ -200,14 +206,14 @@ IMAGE_TAG=1.0.1 docker compose -f docker-compose.images.yml up -d
 Windows Docker host (PowerShell):
 
 ```powershell
-$env:IMAGE_TAG = "1.0.1"
+$env:IMAGE_TAG = "1.0.2"
 docker compose -f docker-compose.images.yml run --rm app php scripts/migrate.php
 ```
 
 Linux Docker host:
 
 ```bash
-IMAGE_TAG=1.0.1 docker compose -f docker-compose.images.yml run --rm app php scripts/migrate.php
+IMAGE_TAG=1.0.2 docker compose -f docker-compose.images.yml run --rm app php scripts/migrate.php
 ```
 
 ## Cross-Platform Notes
