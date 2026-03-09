@@ -18,7 +18,7 @@ if (!is_int($userId)) {
     header('Location: /login.php');
     exit;
 }
-$appVersion = (string) ($config['version'] ?? '1.0.3');
+$appVersion = (string) ($config['version'] ?? '1.0.4');
 
 $error = null;
 $success = null;

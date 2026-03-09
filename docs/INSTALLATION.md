@@ -1,6 +1,6 @@
 # rJournaler_Web Installation Guide
 
-This guide covers the Windows-to-Windows deployment flow you are using:
+This guide covers the Windows-to-Windows deployment flow for rJournaler_Web v1.0.4:
 
 - source machine: package and transfer build artifact
 - Docker host machine: build images locally and run containers

@@ -10,7 +10,7 @@ use App\Security\Csrf;
 
 $userTimeZone = Auth::timezonePreference() ?? date_default_timezone_get();
 $interfaceTheme = Auth::interfaceTheme();
-$appVersion = (string) ($config['version'] ?? '1.0.0');
+$appVersion = (string) ($config['version'] ?? '1.0.4');
 $csrfToken = Csrf::token();
 $isAdmin = Auth::isAdmin();
 $serverOsFamily = strtoupper((string) PHP_OS_FAMILY);

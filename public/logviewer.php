@@ -11,7 +11,7 @@ use App\Auth\Auth;
 $userTimeZone = Auth::timezonePreference() ?? date_default_timezone_get();
 $interfaceTheme = Auth::interfaceTheme();
 $appVersion = (string) ($config['version'] ?? '1.0.0');
-$appVersion = (string) ($config['version'] ?? '1.0.3');
+$appVersion = (string) ($config['version'] ?? '1.0.4');
 ?>
 <!doctype html>
 <html lang="en">

@@ -17,8 +17,8 @@ if (!is_int($userId)) {
 $userTimeZone = Auth::timezonePreference() ?? date_default_timezone_get();
 $interfaceTheme = Auth::interfaceTheme();
 $appVersion = (string) ($config['version'] ?? '1.0.0');
-$appVersion = (string) ($config['version'] ?? '1.0.3');
-// Updated app version fallback to 1.0.3
+$appVersion = (string) ($config['version'] ?? '1.0.4');
+// Updated app version fallback to 1.0.4
 
 $userNow = new DateTimeImmutable('now', new DateTimeZone($userTimeZone));
 $monthStart = $userNow->modify('first day of this month')->format('Y-m-01');

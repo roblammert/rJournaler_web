@@ -2,62 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.4] - 2026-03-09
+
+### Added
+- Mobile Ready Editor Fix: Manual mode toggle pill/button for desktop/mobile UI, persistent mode selection via localStorage, and robust mobile UI features regardless of device detection.
+- All entry, dashboard, and admin pages updated to reference v1.0.4.
+- Documentation, changelog, and installation guide updated for v1.0.4.
+
+### Changed
+- All interface pills and deployment instructions now reflect 1.0.4.
+- Docker compose and config files default to tag 1.0.4.
+- See `docs/releases/v1.0.4-release-notes.md` for full highlights and upgrade steps.
+
+### Fixed
+- Fixed unreliable device detection for mobile UI.
+- Mode pill/button now persists selection and updates all UI features.
+
 ## [1.0.3] - 2026-03-09
-
-### Fixed
-- Restored all entry points and dashboards after blank page/deployment issues.
-- Updated all version references to 1.0.3 across PHP, configs, docs, and interface.
-- Verified baseline features and breakfixes for entry, dashboard, metadata, and workflow.
-
-### Changed
-- Interface pills and deployment instructions now reflect 1.0.3.
-- Docker compose and config files default to tag 1.0.3.
-- See `docs/releases/v1.0.3-release-notes.md` for full highlights and upgrade steps.
-
-## [1.0.2] - 2026-03-09
-
-### Changed
-- Editor layout and UX overhaul for mobile and desktop:
-  - Responsive editor region with stable desktop sizing and foldable metadata panel.
-  - Mobile fullscreen mode with viewport lock, toolbar compaction, and stats row placement.
-  - Portrait mode label abbreviations and heading dropdown.
-  - Metadata panel only visible for entries in COMPLETE stage.
-- Updated all documentation and deployment defaults to version 1.0.2.
-
-### Fixed
-- Eliminated editor reflow/jitter in fullscreen and desktop modes.
-- Fixed duplicate editor node and toolbar button issues.
-- Hardened mobile/desktop mode switching and stats alignment.
-
-### Deployment
-- All Docker compose and config files now default to tag 1.0.2.
-- See `docs/releases/v1.0.2-release-notes.md` for full highlights and upgrade steps.
-
-## [1.0.1] - 2026-03-08
-
-### Added
-- Added installation guide for Windows source to Windows Docker host deployment:
-	- `docs/INSTALLATION.md`
-
-### Changed
-- Updated release/documentation references from `1.0.0` to `1.0.1` across env/config/docs defaults.
-- Updated image-based compose and deployment scripts to default to tag `1.0.1`.
-- Updated README deployment examples and added explicit installation guide reference.
-
-### Fixed
-- Fixed Docker host deployment scripts to fail fast on Docker command errors instead of continuing after failures.
-- Fixed image deployment flow to avoid unexpected registry pulls (`pull_policy: never`, `--pull never`).
-- Fixed build/load behavior so packaged image builds are loaded into local Docker image store (`buildx --load`).
-- Fixed image-only app runtime issue where source files were not present in container images.
-- Fixed PHP container build/runtime for weather refresh by adding required Python runtime/venv support and Linux-compatible interpreter resolution.
-- Fixed weather refresh loop behavior for no-cache scenarios by prioritizing immediate fetch path and improving lock-timeout handling.
-
-## [1.0.0] - 2026-03-08
-
-### Added
-- Added full production application surface:
-	- Auth and session pages (`login`, `logout`, dashboard, user/admin settings)
-	- Entry editor workflow
 	- Analysis dashboards
 	- Queue/status monitoring dashboard
 	- Import review and admin reprocess workflows

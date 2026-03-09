@@ -16,7 +16,7 @@ use App\Security\TrustedDeviceManager;
 
 $error = null;
 $step = 'credentials';
-$appVersion = (string) ($config['version'] ?? '1.0.3');
+$appVersion = (string) ($config['version'] ?? '1.0.4');
 
 if (Auth::check()) {
     header('Location: /index.php');

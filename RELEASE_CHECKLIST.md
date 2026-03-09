@@ -2,7 +2,7 @@
 
 ## Pre-Release
 
-1. Confirm release version in config/env (`APP_VERSION`) matches target tag.
+1. Confirm release version in config/env (`APP_VERSION`) matches target tag v1.0.4.
 2. Run migrations dry-run: `php scripts/migrate.php --dry-run`.
 3. Run syntax checks:
    - `php -l public/admin-reprocess.php`
@@ -17,7 +17,7 @@
 5. Verify docs updated:
    - `README.md`
    - `CHANGELOG.md`
-   - `docs/releases/v<version>-release-notes.md`
+   - `docs/releases/v1.0.4-release-notes.md`
 
 ## Release Execution
 

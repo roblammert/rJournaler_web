@@ -8,7 +8,7 @@ require_once dirname(__DIR__, 2) . '/app/Auth/require_auth.php';
 use App\Auth\Auth;
 
 $interfaceTheme = Auth::interfaceTheme();
-$appVersion = (string) ($config['version'] ?? '1.0.3');
+$appVersion = (string) ($config['version'] ?? '1.0.4');
 ?>
 <!doctype html>
 <html lang="en">

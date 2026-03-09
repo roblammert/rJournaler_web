@@ -15,7 +15,7 @@ $userId = Auth::userId();
 $userTimeZone = Auth::timezonePreference() ?? date_default_timezone_get();
 $interfaceTheme = Auth::interfaceTheme();
 $appVersion = (string) ($config['version'] ?? '1.0.3');
-$appVersion = (string) ($config['version'] ?? '1.0.3');
+$appVersion = (string) ($config['version'] ?? '1.0.4');
 if (!is_int($userId)) {
     header('Location: /login.php');
     exit;
@@ -653,6 +653,143 @@ function renderListValues(mixed $value): string
             box-shadow: var(--shadow-sm);
         }
 
+        /* Manual mode override to force mobile UI without device media detection. */
+        body.mode-mobile .editor-stats-row { font-size: 0.82rem; }
+        body.mode-mobile .editor-toolbar .toolbar-mobile-only { display: inline-flex; }
+        body.mode-mobile .editor-toolbar .toolbar-status { display: inline-flex; font-size: 0.9rem; }
+        body.mode-mobile #save-status { display: none; }
+        body.mode-mobile .editor-block,
+        body.mode-mobile .editor-shell,
+        body.mode-mobile .editor-stats-row { max-width: 98vw; }
+        body.mode-mobile .editor-toolbar button { padding: 0.32rem 0.52rem; }
+
+        html.mode-mobile.editor-mobile-fullscreen,
+        body.mode-mobile.editor-mobile-fullscreen {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+        }
+
+        body.mode-mobile.editor-mobile-fullscreen .editor-block {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            width: 100vw;
+            max-width: 100vw;
+            margin: 0;
+            padding: 0;
+            background: var(--surface);
+            display: flex;
+            flex-direction: column;
+            --mobile-toolbar-height: 3.15rem;
+            --mobile-stats-height: 2.45rem;
+            height: var(--editor-mobile-fullscreen-height, 100svh);
+            min-height: var(--editor-mobile-fullscreen-height, 100svh);
+            max-height: var(--editor-mobile-fullscreen-height, 100svh);
+            overflow: hidden;
+            contain: strict;
+        }
+        body.mode-mobile.editor-mobile-fullscreen .editor-block > label { display: none; }
+        body.mode-mobile.editor-mobile-fullscreen .editor-shell {
+            max-width: none;
+            margin: 0;
+            flex: 1;
+            display: grid;
+            grid-template-rows: var(--mobile-toolbar-height) minmax(0, 1fr);
+            border-radius: 0;
+            border-left: 0;
+            border-right: 0;
+        }
+        body.mode-mobile.editor-mobile-fullscreen .editor-toolbar,
+        body.mode-mobile.editor-mobile-fullscreen .editor-stats-row { flex-shrink: 0; }
+        body.mode-mobile.editor-mobile-fullscreen .editor-toolbar {
+            height: var(--mobile-toolbar-height);
+            min-height: var(--mobile-toolbar-height);
+            max-height: var(--mobile-toolbar-height);
+            box-sizing: border-box;
+            flex-wrap: nowrap;
+            align-items: center;
+            align-content: center;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            contain: layout paint;
+        }
+        body.mode-mobile.editor-mobile-fullscreen .editor-toolbar button { flex: 0 0 auto; }
+        body.mode-mobile.editor-mobile-fullscreen .editor-toolbar .toolbar-status {
+            flex: 0 0 5.2rem;
+            width: 5.2rem;
+            min-width: 5.2rem;
+            max-width: 5.2rem;
+        }
+        body.mode-mobile.editor-mobile-fullscreen .editor-surface {
+            height: auto;
+            max-height: none;
+            min-height: 0;
+            flex: 1;
+            overflow-y: scroll;
+            overflow-x: hidden;
+            scrollbar-gutter: stable both-edges;
+            overscroll-behavior: contain;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            contain: layout paint;
+        }
+        body.mode-mobile.editor-mobile-fullscreen .editor-stats-row {
+            max-width: none;
+            margin: 0;
+            padding: 0.55rem 0.65rem;
+            background: var(--surface-soft);
+            border-top: 1px solid var(--border);
+            height: var(--mobile-stats-height);
+            min-height: var(--mobile-stats-height);
+            max-height: var(--mobile-stats-height);
+            box-sizing: border-box;
+            white-space: nowrap;
+            overflow: hidden;
+            align-items: center;
+            contain: layout paint;
+        }
+
+        body.mode-mobile.mode-mobile-portrait { padding: 0.55rem; }
+        body.mode-mobile.mode-mobile-portrait .panel { padding: 0.55rem; }
+        body.mode-mobile.mode-mobile-portrait .layout,
+        body.mode-mobile.mode-mobile-portrait .editor-block,
+        body.mode-mobile.mode-mobile-portrait .editor-shell,
+        body.mode-mobile.mode-mobile-portrait .editor-stats-row {
+            width: 100%;
+            max-width: 100%;
+        }
+        body.mode-mobile.mode-mobile-portrait .editor-toolbar {
+            gap: 0.25rem;
+            padding: 0.35rem;
+            min-height: 4.6rem;
+            align-content: start;
+        }
+        body.mode-mobile.mode-mobile-portrait.editor-mobile-fullscreen .editor-toolbar {
+            min-height: var(--mobile-toolbar-height);
+            align-content: center;
+        }
+        body.mode-mobile.mode-mobile-portrait.editor-mobile-fullscreen .editor-toolbar button[data-cmd="insertUnorderedList"],
+        body.mode-mobile.mode-mobile-portrait.editor-mobile-fullscreen .editor-toolbar button[data-cmd="insertOrderedList"] {
+            display: none;
+        }
+        body.mode-mobile.mode-mobile-portrait .editor-toolbar button {
+            padding: 0.26rem 0.4rem;
+            font-size: 0.82rem;
+        }
+        body.mode-mobile.mode-mobile-portrait .editor-toolbar .toolbar-heading-button { display: none; }
+        body.mode-mobile.mode-mobile-portrait .editor-toolbar .toolbar-heading-select { display: inline-block; }
+        body.mode-mobile.mode-mobile-portrait .editor-toolbar .toolbar-status {
+            min-width: 5.2rem;
+            font-size: 0.95rem;
+        }
+        body.mode-mobile.mode-mobile-portrait .editor-stats-row {
+            gap: 0.3rem;
+            padding-inline: 0.45rem;
+            font-size: 0.76rem;
+        }
+
         .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 1rem; }
         @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } }
         @media (min-width: 961px) {
@@ -1116,6 +1253,9 @@ function renderListValues(mixed $value): string
                     <a class="pill" href="/index.php">Back to Dashboard</a>
                     <span class="pill">Theme: <?php echo htmlspecialchars(ucfirst($interfaceTheme), ENT_QUOTES, 'UTF-8'); ?></span>
                     <span class="pill">rJournaler_Web: v<?php echo htmlspecialchars($appVersion, ENT_QUOTES, 'UTF-8'); ?></span>
+                </div>
+                <div class="mode-toggle-row" style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:1rem;">
+                    <button id="mode-toggle-pill" type="button" style="border:none;background:#eee;border-radius:999px;padding:0.4rem 1.2rem;font-weight:bold;font-size:1rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer;">Mode: Desktop</button>
                 </div>
             </header>
 
@@ -1587,6 +1727,66 @@ function renderListValues(mixed $value): string
         const mobileFullscreenButton = editorToolbar
             ? editorToolbar.querySelector('button[data-custom="toggle-mobile-fullscreen"]')
             : null;
+        const modeStorageKey = 'entryPageMode';
+        let currentMode = 'desktop';
+        const modeTogglePill = document.getElementById('mode-toggle-pill');
+
+        function getSavedMode() {
+            try {
+                const saved = String(window.localStorage.getItem(modeStorageKey) || '').toLowerCase();
+                return saved === 'mobile' ? 'mobile' : 'desktop';
+            } catch (_error) {
+                return 'desktop';
+            }
+        }
+
+        function saveMode(mode) {
+            try {
+                window.localStorage.setItem(modeStorageKey, mode);
+            } catch (_error) {
+                // Ignore storage failures and continue with in-memory mode.
+            }
+        }
+
+        function syncModeClasses() {
+            const mobileMode = currentMode === 'mobile';
+            const portraitMode = mobileMode && window.matchMedia('(orientation: portrait)').matches;
+
+            document.body.classList.toggle('mode-mobile', mobileMode);
+            document.documentElement.classList.toggle('mode-mobile', mobileMode);
+            document.body.classList.toggle('mode-mobile-portrait', portraitMode);
+            document.documentElement.classList.toggle('mode-mobile-portrait', portraitMode);
+        }
+
+        function setMode(newMode) {
+            currentMode = newMode === 'mobile' ? 'mobile' : 'desktop';
+            saveMode(currentMode);
+            syncModeClasses();
+
+            if (!isMobileViewport() && document.body.classList.contains('editor-mobile-fullscreen')) {
+                document.body.classList.remove('editor-mobile-fullscreen');
+                document.documentElement.classList.remove('editor-mobile-fullscreen');
+            }
+
+            if (modeTogglePill) {
+                modeTogglePill.textContent = 'Mode: ' + (currentMode.charAt(0).toUpperCase() + currentMode.slice(1));
+                modeTogglePill.className = 'mode-pill mode-' + currentMode;
+            }
+
+            refreshStatsLabels();
+            lockFullscreenViewportHeight();
+            refreshMobileFullscreenButton();
+            lockDesktopEditorHeight();
+            computeStats(textarea.value);
+            lastPortraitMobile = isPortraitMobileViewport();
+        }
+
+        if (modeTogglePill) {
+            modeTogglePill.addEventListener('click', function() {
+                setMode(currentMode === 'desktop' ? 'mobile' : 'desktop');
+            });
+        }
+
         const workflowStage = document.getElementById('workflow-stage');
         const saveStatus = document.getElementById('save-status');
         const saveStatusMobile = document.getElementById('save-status-mobile');
@@ -1729,23 +1929,27 @@ function renderListValues(mixed $value): string
         }
 
         function isMobileViewport() {
-            return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+            return currentMode === 'mobile';
         }
 
         function isPortraitMobileViewport() {
-            return isMobileViewport() && window.matchMedia('(orientation: portrait)').matches;
+            if (currentMode === 'mobile') {
+                // Optionally, check orientation for portrait mode
+                return window.matchMedia('(orientation: portrait)').matches;
+            }
+            return false;
         }
 
         function refreshStatsLabels() {
             const portraitMobile = isPortraitMobileViewport();
             if (wordCountLabel) {
-                wordCountLabel.textContent = portraitMobile ? 'WC:' : 'Word count:';
+                wordCountLabel.textContent = isMobileViewport() ? (portraitMobile ? 'WC:' : 'Word count:') : 'Word count:';
             }
             if (wordGoalLabel) {
-                wordGoalLabel.textContent = portraitMobile ? 'Goal:' : 'Daily Goal:';
+                wordGoalLabel.textContent = isMobileViewport() ? (portraitMobile ? 'Goal:' : 'Daily Goal:') : 'Daily Goal:';
             }
             if (readTimeLabel) {
-                readTimeLabel.textContent = portraitMobile ? 'Read Time:' : 'Estimated read time:';
+                readTimeLabel.textContent = isMobileViewport() ? (portraitMobile ? 'Read Time:' : 'Estimated read time:') : 'Estimated read time:';
             }
         }
 
@@ -2339,6 +2543,7 @@ function renderListValues(mixed $value): string
         finalizeButton.addEventListener('click', () => callStageAction('/api/entry-finalize.php', 'Entry marked as final'));
         deleteButton.addEventListener('click', deleteEntry);
         window.addEventListener('resize', () => {
+            syncModeClasses();
             const portraitNow = isPortraitMobileViewport();
             const orientationChanged = portraitNow !== lastPortraitMobile;
 
@@ -2450,6 +2655,8 @@ function renderListValues(mixed $value): string
                 });
             });
         }
+
+        setMode(getSavedMode());
 
         computeStats(textarea.value);
         refreshStatsLabels();

@@ -2,7 +2,7 @@
 
 Production-ready journaling web application using PHP + JavaScript + MySQL, with Python Optimus/Autobot background workers.
 
-Current release: `1.0.2`
+Current release: `1.0.4`
 
 ## Highlights in 1.0.2
 
@@ -20,60 +20,13 @@ Current release: `1.0.2`
 - Weather metadata processing (Meta Group 3), weather presets, and dashboard weather widgets.
 - Cross-platform operations support for Windows dev and Linux/Docker production.
 
-## Core Pages
+## Highlights in 1.0.4
 
-- `public/login.php`
-- `public/index.php`
-- `public/entry.php`
-- `public/user-settings.php`
-- `public/admin-settings.php`
-- `public/admin-reprocess.php`
-- `public/import-review.php`
-- `public/logviewer.php`
-- `public/dashboards/status.php`
-- `public/dashboards/analysis-simple.php`
-- `public/dashboards/analysis-deep.php`
-- `public/dashboards/analysis-timeline.php`
+- Mobile Ready Editor Fix: Manual mode toggle pill/button for desktop/mobile UI, persistent mode selection via localStorage, and robust mobile UI features regardless of device detection.
+- All entry, dashboard, and admin pages updated to reference v1.0.4.
+- Documentation, changelog, and installation guide updated for v1.0.4.
 
-## Quick Start
-
-### Prereqs
-
-- PHP with extensions: `pdo_mysql`, `mbstring`, `openssl`, `zip`
-- MySQL 8+
-- Python 3.11+
-
-### Setup
-
-1. Copy environment file.
-
-Windows:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Linux:
-
-```bash
-cp .env.example .env
-```
-
-2. Configure DB + app settings in `.env`.
-  - Set `APP_VERSION` (for UI version pill), e.g. `1.0.2`.
-3. Run migrations.
-
-```powershell
-php scripts/migrate.php
-```
-
-4. Start PHP app.
-
-```powershell
-php -S localhost:8080 -t public
-```
-
-5. Start worker (separate terminal).
+See `docs/releases/v1.0.4-release-notes.md` for full highlights and upgrade steps.
 
 Windows:
 
