@@ -12,7 +12,6 @@ use App\Security\Csrf;
 
 $error = null;
 $success = null;
-$appVersion = (string) ($config['version'] ?? '1.0.4');
 $ollamaTestResult = null;
 $weatherSchemaWarning = null;
 $weatherSchemaMigrationCommand = 'php scripts/migrate.php --to=013_meta_group_3_weather.sql';

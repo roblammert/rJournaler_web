@@ -14,8 +14,7 @@ use App\Security\Csrf;
 $userId = Auth::userId();
 $userTimeZone = Auth::timezonePreference() ?? date_default_timezone_get();
 $interfaceTheme = Auth::interfaceTheme();
-$appVersion = (string) ($config['version'] ?? '1.0.3');
-$appVersion = (string) ($config['version'] ?? '1.0.4');
+
 if (!is_int($userId)) {
     header('Location: /login.php');
     exit;
@@ -369,6 +368,39 @@ try {
 }
 
 $csrfToken = Csrf::token();
+
+// Editor toolbar options (configurable)
+$editorToolbarOptions = [
+    'bold' => 'Bold',
+    'italic' => 'Italic',
+    'underline' => 'Underline',
+    'strikeThrough' => 'Strike',
+    'heading' => 'Headings',
+    'ul' => 'Bulleted List',
+    'ol' => 'Numbered List',
+];
+// Non-configurable buttons: Full Screen, Time
+
+// Load editor settings
+$editorSettings = [
+    'toolbar' => array_keys($editorToolbarOptions),
+];
+try {
+    if (isset($pdo) && $pdo instanceof PDO) {
+        $stmt = $pdo->prepare('SELECT editor_settings_json FROM users WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $userId]);
+        $row = $stmt->fetch();
+        if (is_array($row) && isset($row['editor_settings_json']) && $row['editor_settings_json']) {
+            $json = json_decode($row['editor_settings_json'], true);
+            if (is_array($json) && isset($json['toolbar']) && is_array($json['toolbar'])) {
+                $editorSettings['toolbar'] = $json['toolbar'];
+            }
+        }
+    }
+} catch (Throwable $e) {
+    // Ignore toolbar settings load errors, fallback to default
+}
+
 $entryJson = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 if (!is_string($entryJson)) {
     $entryJson = '{}';
@@ -376,6 +408,14 @@ if (!is_string($entryJson)) {
 $entryWeatherOptionsJson = json_encode($entryWeatherOptions, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 if (!is_string($entryWeatherOptionsJson)) {
     $entryWeatherOptionsJson = '{}';
+}
+$editorToolbarOptionsJson = json_encode($editorToolbarOptions, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+if (!is_string($editorToolbarOptionsJson)) {
+    $editorToolbarOptionsJson = '{}';
+}
+$editorToolbarButtonsJson = json_encode($editorSettings['toolbar'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+if (!is_string($editorToolbarButtonsJson)) {
+    $editorToolbarButtonsJson = '[]';
 }
 
 function formatLocalDateTime(?string $raw, string $targetTimeZone): string
@@ -1291,30 +1331,7 @@ function renderListValues(mixed $value): string
             <div id="editor-block" class="editor-block">
                 <label for="entry-content-editor">Content</label>
                 <div class="editor-shell">
-                <div class="editor-toolbar" id="editor-toolbar">
-                    <button type="button" data-editor-action data-cmd="bold"><strong>B</strong></button>
-                    <button type="button" data-editor-action data-cmd="italic"><em>I</em></button>
-                    <button type="button" data-editor-action data-cmd="underline"><u>U</u></button>
-                    <button type="button" data-editor-action data-cmd="strikeThrough"><s>S</s></button>
-                    <button type="button" class="toolbar-heading-button" data-editor-action data-block="h1">H1</button>
-                    <button type="button" class="toolbar-heading-button" data-editor-action data-block="h2">H2</button>
-                    <button type="button" class="toolbar-heading-button" data-editor-action data-block="h3">H3</button>
-                    <button type="button" class="toolbar-heading-button" data-editor-action data-block="h4">H4</button>
-                    <button type="button" class="toolbar-heading-button" data-editor-action data-block="h5">H5</button>
-                    <select id="editor-heading-select" class="toolbar-heading-select" aria-label="Choose heading level">
-                        <option value="">Head</option>
-                        <option value="h1">H1</option>
-                        <option value="h2">H2</option>
-                        <option value="h3">H3</option>
-                        <option value="h4">H4</option>
-                        <option value="h5">H5</option>
-                    </select>
-                    <button type="button" data-editor-action data-cmd="insertUnorderedList">UL</button>
-                    <button type="button" data-editor-action data-cmd="insertOrderedList">OL</button>
-                    <span id="save-status-mobile" class="toolbar-status" aria-live="polite"></span>
-                    <button type="button" class="toolbar-mobile-only" data-editor-action data-custom="toggle-mobile-fullscreen" title="Toggle fullscreen editor">FS</button>
-                    <button type="button" class="toolbar-time-button" data-editor-action data-custom="insert-time-heading" title="Insert current time">&#128339;</button>
-                </div>
+                <div class="editor-toolbar" id="editor-toolbar"></div>
                 <div id="entry-content-editor" class="editor-surface" contenteditable="true" aria-label="Entry content editor"></div>
             </div>
             <div class="editor-stats-row" aria-live="polite">
@@ -1705,6 +1722,8 @@ function renderListValues(mixed $value): string
 
     <script>
         const initialEntry = <?php echo $entryJson; ?>;
+        const editorToolbarOptions = <?php echo $editorToolbarOptionsJson; ?>;
+        const editorToolbarButtons = <?php echo $editorToolbarButtonsJson; ?>;
         const textarea = document.getElementById('entry-content');
         const titleInput = document.getElementById('entry-title');
         const dateInput = document.getElementById('entry-date');
@@ -1723,6 +1742,77 @@ function renderListValues(mixed $value): string
         const editorStatsRow = editorBlock ? editorBlock.querySelector('.editor-stats-row') : null;
         const editorSurface = document.getElementById('entry-content-editor');
         const editorToolbar = document.getElementById('editor-toolbar');
+        // Dynamically render toolbar buttons based on user settings
+        function renderEditorToolbar() {
+            if (!editorToolbar) return;
+            editorToolbar.innerHTML = '';
+            const btns = Array.isArray(editorToolbarButtons) ? editorToolbarButtons : [];
+            const opts = editorToolbarOptions || {};
+            // Always show Full Screen and Time buttons at the end
+            btns.forEach((key) => {
+                switch (key) {
+                    case 'bold':
+                        editorToolbar.appendChild(createToolbarButton('bold', '<strong>B</strong>', {cmd: 'bold'}));
+                        break;
+                    case 'italic':
+                        editorToolbar.appendChild(createToolbarButton('italic', '<em>I</em>', {cmd: 'italic'}));
+                        break;
+                    case 'underline':
+                        editorToolbar.appendChild(createToolbarButton('underline', '<u>U</u>', {cmd: 'underline'}));
+                        break;
+                    case 'strikeThrough':
+                        editorToolbar.appendChild(createToolbarButton('strikeThrough', '<s>S</s>', {cmd: 'strikeThrough'}));
+                        break;
+                    case 'heading':
+                        // Add heading buttons and select
+                        ['h1','h2','h3','h4','h5'].forEach(h => {
+                            editorToolbar.appendChild(createToolbarButton('heading-'+h, h.toUpperCase(), {block: h, class: 'toolbar-heading-button'}));
+                        });
+                        // Heading select
+                        const select = document.createElement('select');
+                        select.id = 'editor-heading-select';
+                        select.className = 'toolbar-heading-select';
+                        select.setAttribute('aria-label', 'Choose heading level');
+                        select.innerHTML = '<option value="">Head</option>' + ['h1','h2','h3','h4','h5'].map(h => `<option value="${h}">${h.toUpperCase()}</option>`).join('');
+                        editorToolbar.appendChild(select);
+                        break;
+                    case 'ul':
+                        editorToolbar.appendChild(createToolbarButton('ul', 'UL', {cmd: 'insertUnorderedList'}));
+                        break;
+                    case 'ol':
+                        editorToolbar.appendChild(createToolbarButton('ol', 'OL', {cmd: 'insertOrderedList'}));
+                        break;
+                }
+            });
+            // Save status (mobile)
+            const saveStatusMobile = document.createElement('span');
+            saveStatusMobile.id = 'save-status-mobile';
+            saveStatusMobile.className = 'toolbar-status';
+            saveStatusMobile.setAttribute('aria-live', 'polite');
+            editorToolbar.appendChild(saveStatusMobile);
+            // Full Screen button (always shown)
+            const fsBtn = createToolbarButton('fullscreen', 'FS', {custom: 'toggle-mobile-fullscreen', class: 'toolbar-mobile-only', title: 'Toggle fullscreen editor'});
+            editorToolbar.appendChild(fsBtn);
+            // Time button (always shown)
+            const timeBtn = createToolbarButton('time', '&#128339;', {custom: 'insert-time-heading', class: 'toolbar-time-button', title: 'Insert current time'});
+            editorToolbar.appendChild(timeBtn);
+        }
+
+        function createToolbarButton(key, label, opts) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.innerHTML = label;
+            btn.setAttribute('data-editor-action', '');
+            if (opts && opts.cmd) btn.setAttribute('data-cmd', opts.cmd);
+            if (opts && opts.block) btn.setAttribute('data-block', opts.block);
+            if (opts && opts.custom) btn.setAttribute('data-custom', opts.custom);
+            if (opts && opts.class) btn.className = opts.class;
+            if (opts && opts.title) btn.title = opts.title;
+            return btn;
+        }
+
+        renderEditorToolbar();
+        // After rendering, re-query mobileFullscreenButton
         const editorHeadingSelect = document.getElementById('editor-heading-select');
         const mobileFullscreenButton = editorToolbar
             ? editorToolbar.querySelector('button[data-custom="toggle-mobile-fullscreen"]')

@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.0.5] - 2026-03-16
+
+### Added
+- Export Entries feature: Users can export their journal entries in Markdown format, supporting day, week, month, multi-month, and year ranges, with zipped output for multi-file exports.
+- Editor Settings card is now a standalone card in user settings.
+- Centralized `$appVersion` in `app/Support/bootstrap.php` for global access across all pages.
+
+### Changed
+- Export page UI and theming now match the main dashboard for a consistent user experience.
+- Docker build and deployment instructions updated for v1.0.5, including PowerShell build script usage.
+
+### Fixed
+- Fixed dashboard JavaScript error related to wind information display.
+- Improved error handling and validation for export and settings features.
+
+### Documentation
+- Updated README, installation guide, and release notes for v1.0.5.
+
 ## [1.0.4] - 2026-03-09
 
 ### Added

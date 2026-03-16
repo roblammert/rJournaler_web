@@ -14,10 +14,6 @@ use App\Security\Csrf;
 $interfaceTheme = Auth::interfaceTheme();
 $adminUserId = Auth::userId();
 $token = Csrf::token();
-$appVersion = (string) ($config['version'] ?? '1.0.0');
-$appVersion = (string) ($config['version'] ?? '1.0.4');
-// This line updates the application version to 1.0.4
-
 
 $stageMap = [
     'meta_group_0' => 'Meta Group 0',

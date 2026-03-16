@@ -10,8 +10,7 @@ use App\Core\Database;
 
 $userTimeZone = Auth::timezonePreference() ?? date_default_timezone_get();
 $interfaceTheme = Auth::interfaceTheme();
-$appVersion = (string) ($config['version'] ?? '1.0.0');
-$appVersion = (string) ($config['version'] ?? '1.0.3');
+
 $model = trim((string) ($_GET['model'] ?? ''));
 $missingOnly = (string) ($_GET['missing'] ?? '0') === '1';
 

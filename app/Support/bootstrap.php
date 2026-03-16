@@ -1,6 +1,6 @@
 <?php
-
 declare(strict_types=1);
+$appVersion = (string) ($config['version'] ?? '1.0.5');
 
 require_once __DIR__ . '/env.php';
 

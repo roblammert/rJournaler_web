@@ -9,8 +9,7 @@ use App\Auth\Auth;
 
 $userTimeZone = Auth::timezonePreference() ?? date_default_timezone_get();
 $interfaceTheme = Auth::interfaceTheme();
-$appVersion = (string) ($config['version'] ?? '1.0.0');
-$appVersion = (string) ($config['version'] ?? '1.0.4');
+
 ?>
 <!doctype html>
 <html lang="en">
@@ -237,9 +236,11 @@ $appVersion = (string) ($config['version'] ?? '1.0.4');
                 <div id="days-group">
                     <label for="range-days">Days</label>
                     <select id="range-days">
+                        <option value="7" selected>7</option>
+                        <option value="14">14</option>
                         <option value="30">30</option>
                         <option value="60">60</option>
-                        <option value="90" selected>90</option>
+                        <option value="90">90</option>
                         <option value="180">180</option>
                         <option value="365">365</option>
                     </select>

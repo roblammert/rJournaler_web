@@ -1,44 +1,22 @@
 # rJournaler_web
 
+
 Production-ready journaling web application using PHP + JavaScript + MySQL, with Python Optimus/Autobot background workers.
 
-Current release: `1.0.4`
+Current release: `1.0.5`
 
-## Highlights in 1.0.2
+## Highlights in 1.0.5
 
-- Editor UX upgrade for desktop and mobile:
-  - responsive markdown editor sizing and scroll behavior
-  - mobile fullscreen editing with stable top/bottom bars
-  - portrait-focused toolbar compaction and heading selector
-  - processed metadata foldout panel under editor stats on desktop
+- Export Entries: Users can export their journal entries in Markdown format, supporting day, week, month, multi-month, and year ranges, with zipped output for multi-file exports.
+- Editor Settings card is now a standalone card in user settings.
+- Centralized `$appVersion` in `app/Support/bootstrap.php` for global access across all pages.
+- Export page UI and theming now match the main dashboard for a consistent user experience.
+- Fixed dashboard JavaScript error related to wind information display.
+- Improved error handling and validation for export and settings features.
+- Docker build and deployment instructions updated for v1.0.5, including PowerShell build script usage.
 
-- Secure auth stack: username/password, TOTP MFA, trusted devices, CSRF, audit logging.
-- End-to-end entry workflow: `AUTOSAVE -> WRITTEN -> FINISHED -> IN_PROCESS -> COMPLETE/FINAL/ERROR`.
-- Stage-based processing pipeline with Optimus orchestrator and Autobot workers.
-- Admin operations UI: queue status, force kill/restart, stale lock reconcile, targeted reprocess.
-- Full import/review flow for monthly ZIP journals with accept/deny and queue handoff.
-- Weather metadata processing (Meta Group 3), weather presets, and dashboard weather widgets.
-- Cross-platform operations support for Windows dev and Linux/Docker production.
+See `docs/releases/v1.0.5-release-notes.md` for full highlights and upgrade steps.
 
-## Highlights in 1.0.4
-
-- Mobile Ready Editor Fix: Manual mode toggle pill/button for desktop/mobile UI, persistent mode selection via localStorage, and robust mobile UI features regardless of device detection.
-- All entry, dashboard, and admin pages updated to reference v1.0.4.
-- Documentation, changelog, and installation guide updated for v1.0.4.
-
-See `docs/releases/v1.0.4-release-notes.md` for full highlights and upgrade steps.
-
-Windows:
-
-```powershell
-python python/worker/main.py
-```
-
-Linux/Docker:
-
-```bash
-python3 python/worker/main.py
-```
 
 ## Docker (External MySQL)
 
@@ -48,6 +26,23 @@ This repository includes a minimal Docker setup for:
 - `worker` (Python Optimus/Autobot)
 
 No MySQL container is included. Use your existing external MySQL instance.
+
+### Build and Deploy for v1.0.5
+
+**Build images from a transfer package on the Docker host:**
+
+```powershell
+./scripts/build-images-from-package.ps1 -PackagePath .\rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz -Tag 1.0.5
+```
+
+**Run with image-based compose:**
+
+```powershell
+$env:IMAGE_TAG = "1.0.5"
+docker compose -f docker-compose.images.yml up -d
+```
+
+See the installation guide for full details.
 
 1. Set external DB connection values in `.env`.
   - If MySQL runs on the same machine as Docker engine: set `DB_HOST=host.docker.internal` (requires host-gateway support).

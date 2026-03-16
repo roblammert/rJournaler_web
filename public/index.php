@@ -16,9 +16,6 @@ if (!is_int($userId)) {
 
 $userTimeZone = Auth::timezonePreference() ?? date_default_timezone_get();
 $interfaceTheme = Auth::interfaceTheme();
-$appVersion = (string) ($config['version'] ?? '1.0.0');
-$appVersion = (string) ($config['version'] ?? '1.0.4');
-// Updated app version fallback to 1.0.4
 
 $userNow = new DateTimeImmutable('now', new DateTimeZone($userTimeZone));
 $monthStart = $userNow->modify('first day of this month')->format('Y-m-01');
@@ -673,7 +670,7 @@ function sentimentClass(?float $score): string
                 <article class="card">
                     <div class="label">Total Entries / Days of Month</div>
                     <div id="card-month-entries-value" class="value"><?php echo formatInteger((int) $stats['month_entries']); ?> / <?php echo formatInteger($daysInMonth); ?></div>
-                    <div class="sub">Month: <?php echo htmlspecialchars($userNow->format('F Y'), ENT_QUOTES, 'UTF-8'); ?></div>
+                    <div class="sub"><?php echo htmlspecialchars($userNow->format('F Y'), ENT_QUOTES, 'UTF-8'); ?></div>
                 </article>
                 <article class="card">
                     <div class="label">Total Words</div>
@@ -688,7 +685,7 @@ function sentimentClass(?float $score): string
                     <div id="card-month-avg-read-time-value" class="value"><?php echo formatDecimal((float) $stats['month_avg_read_time'], 1); ?> min</div>
                 </article>
                 <article id="card-sentiment" class="card <?php echo htmlspecialchars(sentimentClass(is_float($stats['month_avg_sentiment_score']) ? (float) $stats['month_avg_sentiment_score'] : null), ENT_QUOTES, 'UTF-8'); ?>">
-                    <div class="label">Avg Sentiment Score (With Label)</div>
+                    <div class="label">Avg Sentiment Score</div>
                     <?php if (is_float($stats['month_avg_sentiment_score'])): ?>
                         <div id="card-sentiment-value" class="value"><?php echo formatDecimal((float) $stats['month_avg_sentiment_score'], 2); ?> / 5</div>
                         <div id="card-sentiment-sub" class="sub"><?php echo htmlspecialchars((string) $stats['month_avg_sentiment_label'], ENT_QUOTES, 'UTF-8'); ?></div>
@@ -734,6 +731,7 @@ function sentimentClass(?float $score): string
                         <h3 class="control-group-title">User Actions</h3>
                         <div class="control-pill-grid">
                             <a class="control-pill" href="/entry.php">Entry Editor</a>
+                            <a class="control-pill" href="/export-entries.php">Export Entries</a>
                             <a class="control-pill" href="/logout.php">Log Out</a>
                         </div>
                     </section>
@@ -933,7 +931,7 @@ function sentimentClass(?float $score): string
             if (!Number.isFinite(numeric)) {
                 return '--';
             }
-            return Math.round(numeric) + 'F';
+            return Math.round(numeric) + '° F';
         }
 
         function renderForecastRow(forecastDays) {
@@ -988,6 +986,20 @@ function sentimentClass(?float $score): string
             }, Math.max(500, Number(delayMs) || 5000));
         }
 
+        function degreesToCardinal(degrees) {
+            // Array of 16 cardinal directions
+            const directions = [
+                'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'
+            ];
+            // Normalize the degrees to be within 0-360
+            degrees = ((Number(degrees) % 360) + 360) % 360;
+            // Calculate the index in the array
+            // 360 degrees / 16 directions = 22.5 degrees per direction
+            // Adding 11.25 (half of 22.5) shifts the boundaries so rounding works correctly for North (0 degrees)
+            const index = Math.round(degrees / 22.5) % 16;
+            return directions[index];
+        }
         function renderWeather(data) {
             const weather = data && data.weather && data.weather.ok ? data.weather : null;
             const refreshing = data && data.refreshing === true;
@@ -1024,15 +1036,16 @@ function sentimentClass(?float $score): string
             } else {
                 weatherUpdated.textContent = refreshing ? 'Last updated: pending refresh...' : 'Last updated: just now';
             }
-            setWeatherText(weatherTemp, formatMaybeNumber(current.temperature_f, ' F'));
-            setWeatherText(weatherFeelsLike, formatMaybeNumber(current.feels_like_f, ' F'));
+            setWeatherText(weatherTemp, formatMaybeNumber(current.temperature_f, '° F'));
+            setWeatherText(weatherFeelsLike, formatMaybeNumber(current.feels_like_f, '° F'));
             setWeatherText(weatherHumidity, formatMaybeNumber(current.humidity_percent, '%'));
-            setWeatherText(weatherDewPoint, formatMaybeNumber(current.dew_point_f, ' F'));
+            setWeatherText(weatherDewPoint, formatMaybeNumber(current.dew_point_f, '° F'));
             const windSpeed = formatMaybeNumber(current.wind_speed_mph, ' mph');
             const gust = Number(current.wind_gust_mph);
             const gustPart = Number.isFinite(gust) ? (' (gust ' + gust.toFixed(1) + ' mph)') : '';
-            const direction = Number(current.wind_direction_degrees);
-            const dirPart = Number.isFinite(direction) ? (' @ ' + direction.toFixed(0) + ' deg') : '';
+            const direction = degreesToCardinal(current.wind_direction_degrees);
+            const dirPart = String(direction || '').trim() !== '' ? (' ' + direction) : '';
+            
             setWeatherText(weatherWind, windSpeed + dirPart + gustPart);
             const summary = String(current.summary || '-');
             setWeatherText(weatherSummary, summary);

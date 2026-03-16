@@ -16,7 +16,6 @@ if (!is_int($userId)) {
     exit;
 }
 $interfaceTheme = Auth::interfaceTheme();
-$appVersion = (string) ($config['version'] ?? '1.0.4');
 
 $error = null;
 $success = null;

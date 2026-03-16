@@ -1,6 +1,37 @@
 <?php
-
 declare(strict_types=1);
+
+
+function sanitizeWeatherLocationInput(array $input): array
+{
+    $label = trim((string) ($input['label'] ?? ''));
+    $city = trim((string) ($input['city'] ?? ''));
+    $state = trim((string) ($input['state'] ?? ''));
+    $zip = trim((string) ($input['zip'] ?? ''));
+    $country = strtoupper(trim((string) ($input['country'] ?? 'US')));
+    if ($country === '') {
+        $country = 'US';
+    }
+    if ($city === '') {
+        $city = 'New Richmond';
+    }
+    if ($state === '') {
+        $state = 'WI';
+    }
+    if ($zip === '') {
+        $zip = '54017';
+    }
+    if ($label === '') {
+        $label = $city . ', ' . $state . ', ' . $country;
+    }
+    return [
+        'label' => $label,
+        'city' => $city,
+        'state' => $state,
+        'zip' => $zip,
+        'country' => $country,
+    ];
+}
 
 require_once dirname(__DIR__) . '/app/Support/bootstrap.php';
 require_once dirname(__DIR__) . '/app/Auth/require_auth.php';
@@ -12,24 +43,52 @@ use App\Security\Crypto;
 use App\Security\Csrf;
 use App\Security\Totp;
 use App\Security\TotpProvisioning;
-
 $userId = Auth::userId();
 if (!is_int($userId)) {
     header('Location: /login.php');
     exit;
 }
-$appVersion = (string) ($config['version'] ?? '1.0.4');
+$editorToolbarOptions = [
+    'bold' => 'Bold',
+    'italic' => 'Italic',
+    'underline' => 'Underline',
+    'strikeThrough' => 'Strike',
+    'heading' => 'Headings',
+    'ul' => 'Bulleted List',
+    'ol' => 'Numbered List',
+];
+// Non-configurable buttons: Full Screen, Time
+$editorSettings = [
+    'toolbar' => array_keys($editorToolbarOptions),
+];
+try {
+    if (isset($pdo) && $pdo instanceof PDO) {
+        $stmt = $pdo->prepare('SELECT editor_settings_json FROM users WHERE id = :id LIMIT 1');
+        $stmt->execute(['id' => $userId]);
+        $row = $stmt->fetch();
+        if (is_array($row) && isset($row['editor_settings_json']) && $row['editor_settings_json']) {
+            $json = json_decode($row['editor_settings_json'], true);
+            if (is_array($json) && isset($json['toolbar']) && is_array($json['toolbar'])) {
+                // Only allow valid toolbar options
+                $editorSettings['toolbar'] = array_values(array_intersect($json['toolbar'], array_keys($editorToolbarOptions)));
+                if (count($editorSettings['toolbar']) === 0) {
+                    $editorSettings['toolbar'] = array_keys($editorToolbarOptions);
+                }
+            }
+        }
+    }
+} catch (Throwable $e) {
+    // Ignore toolbar settings load errors, fallback to default
+}
 
-$error = null;
-$success = null;
-$successTone = 'success';
-$pendingSecret = null;
-$currentQrUrl = null;
-$currentOtpAuthUri = null;
-$pendingQrUrl = null;
-$pendingOtpAuthUri = null;
-$importBatches = [];
-$defaultUidVersionCode = 'W010000';
+$userId = Auth::userId();
+$userId = Auth::userId();
+if (!is_int($userId)) {
+    header('Location: /login.php');
+    exit;
+}
+
+
 $allowedInterfaceThemes = ['light', 'neutral', 'dark'];
 $defaultInterfaceTheme = 'neutral';
 $defaultWeatherPresets = [
@@ -63,14 +122,35 @@ $defaultWeatherPresets = [
         'is_preset' => true,
         'can_delete' => false,
     ],
+    'new_richmond_wi' => [
+        'key' => 'new_richmond_wi',
+        'label' => 'New Richmond, WI, US',
+        'city' => 'New Richmond',
+        'state' => 'WI',
+        'zip' => '54017',
+        'country' => 'US',
+        'is_preset' => true,
+        'can_delete' => false,
+    ],
 ];
-$configuredUidCode = (string) ($config['entry_uid']['app_version_code'] ?? 'W010000');
-if (preg_match('/^[A-Z][0-9]{6}$/', strtoupper($configuredUidCode)) === 1) {
-    $defaultUidVersionCode = strtoupper($configuredUidCode);
-}
+$error = null;
 
-$normalizeTotpSecret = static function (string $raw): string {
-    $secret = trim($raw);
+/**
+ * Decrypt and normalize the TOTP secret from the database.
+ * @param string $storedValue
+ * @return string
+ */
+function resolveTotpSecret(string $storedValue): string
+{
+    $appKey = (string) env('APP_KEY', '');
+    $decrypted = Crypto::decrypt($storedValue, $appKey);
+    $secret = '';
+    if (is_string($decrypted) && $decrypted !== '') {
+        $secret = $decrypted;
+    } else {
+        $secret = $storedValue;
+    }
+    // Remove known prefixes
     if (str_starts_with($secret, 'plain:')) {
         $secret = substr($secret, 6);
     }
@@ -78,67 +158,22 @@ $normalizeTotpSecret = static function (string $raw): string {
         $secret = substr($secret, 7);
     }
     return strtoupper(trim($secret));
-};
-
-$resolveTotpSecret = static function (string $storedValue) use ($normalizeTotpSecret): string {
-    $appKey = (string) env('APP_KEY', '');
-    $decrypted = Crypto::decrypt($storedValue, $appKey);
-    if (is_string($decrypted) && $decrypted !== '') {
-        return $normalizeTotpSecret($decrypted);
-    }
-
-    return $normalizeTotpSecret($storedValue);
-};
-
-/** @return array<string, string> */
-function sanitizeWeatherLocationInput(array $input): array
-{
-    $label = trim((string) ($input['label'] ?? ''));
-    $city = trim((string) ($input['city'] ?? ''));
-    $state = trim((string) ($input['state'] ?? ''));
-    $zip = trim((string) ($input['zip'] ?? ''));
-    $country = strtoupper(trim((string) ($input['country'] ?? 'US')));
-
-    if ($country === '') {
-        $country = 'US';
-    }
-
-    if ($label === '') {
-        $parts = [];
-        if ($city !== '') {
-            $parts[] = $city;
-        }
-        if ($state !== '') {
-            $parts[] = $state;
-        }
-        if ($zip !== '') {
-            $parts[] = $zip;
-        }
-        $parts[] = $country;
-        $label = implode(', ', $parts);
-    }
-
-    return [
-        'label' => $label,
-        'city' => $city,
-        'state' => $state,
-        'zip' => $zip,
-        'country' => $country,
-    ];
 }
 
-/** @return array<string, array<string, string>> */
+/**
+ * Parse custom weather presets JSON from DB.
+ * @param string $raw
+ * @return array<string, array<string, mixed>>
+ */
 function parseWeatherCustomPresets(string $raw): array
 {
     if (trim($raw) === '') {
         return [];
     }
-
     $decoded = json_decode($raw, true);
     if (!is_array($decoded)) {
         return [];
     }
-
     $normalized = [];
     foreach ($decoded as $key => $location) {
         if (!is_string($key) || !is_array($location)) {
@@ -146,9 +181,17 @@ function parseWeatherCustomPresets(string $raw): array
         }
         $normalized[$key] = sanitizeWeatherLocationInput($location);
     }
-
     return $normalized;
 }
+$success = null;
+$successTone = 'success';
+$pendingSecret = null;
+$currentQrUrl = null;
+$currentOtpAuthUri = null;
+$pendingQrUrl = null;
+$pendingOtpAuthUri = null;
+$importBatches = [];
+// ...existing code...
 
 /** @return array<string, array<string, mixed>> */
 function buildWeatherLocations(array $defaultWeatherPresets, array $customPresets): array
@@ -252,7 +295,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $error === null) {
     } else {
         $action = (string) ($_POST['action'] ?? '');
 
-        if ($action === 'update_profile') {
+        if ($action === 'update_editor_settings') {
+            // Save editor toolbar settings for the user
+            $toolbar = isset($_POST['toolbar']) && is_array($_POST['toolbar']) ? array_values(array_filter($_POST['toolbar'], 'is_string')) : [];
+            // Only allow valid toolbar options
+            $toolbar = array_values(array_intersect($toolbar, array_keys($editorToolbarOptions)));
+            if (count($toolbar) === 0) {
+                $error = 'Please select at least one toolbar button.';
+            } else {
+                $settings = [
+                    'toolbar' => $toolbar,
+                ];
+                $json = json_encode($settings, JSON_UNESCAPED_SLASHES);
+                if (!is_string($json)) {
+                    $error = 'Failed to save editor settings.';
+                } else {
+                    $stmt = $pdo->prepare('UPDATE users SET editor_settings_json = :json, updated_at = UTC_TIMESTAMP() WHERE id = :id');
+                    $stmt->execute([
+                        'json' => $json,
+                        'id' => $userId,
+                    ]);
+                    $success = 'Editor settings updated.';
+                    $successTone = 'success';
+                    // Reload settings for display
+                    $editorSettings['toolbar'] = $toolbar;
+                }
+            }
+        } elseif ($action === 'update_profile') {
             $displayName = trim((string) ($_POST['display_name'] ?? ''));
             $timezonePreference = trim((string) ($_POST['timezone_preference'] ?? ''));
             $interfaceTheme = strtolower(trim((string) ($_POST['interface_theme'] ?? $defaultInterfaceTheme)));
@@ -448,7 +517,7 @@ if ($error === null) {
     if (is_array($user)) {
         $storedSecret = (string) ($user['totp_secret_encrypted'] ?? '');
         if ($storedSecret !== '') {
-            $secret = $resolveTotpSecret($storedSecret);
+            $secret = resolveTotpSecret($storedSecret);
             if ($secret !== '') {
                 $accountName = (string) (($user['email'] ?? '') !== '' ? $user['email'] : $user['username']);
                 $issuer = (string) ($config['security']['totp_issuer'] ?? 'rJournaler Web');
@@ -875,9 +944,11 @@ $formatUtcDateTime = static function (?string $value, string $timezone): string 
             <input type="hidden" name="action" value="update_profile">
             <div class="form-grid">
                 <div class="form-field">
+                        
                     <label for="display_name">Display Name</label>
                     <input id="display_name" name="display_name" type="text" maxlength="128" value="<?php echo htmlspecialchars($displayNameValue, ENT_QUOTES, 'UTF-8'); ?>">
                 </div>
+                
                 <div class="form-field">
                     <label for="timezone_preference">Timezone</label>
                     <select id="timezone_preference" name="timezone_preference">
@@ -902,7 +973,30 @@ $formatUtcDateTime = static function (?string $value, string $timezone): string 
             <div class="form-actions"><button type="submit">Save Profile</button></div>
         </form>
     </section>
-
+    <section class="settings-card">
+        <h2>Editor Settings</h2>
+        <form method="post" action="/user-settings.php" class="settings-form">
+            <input type="hidden" name="_csrf" value="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
+            <input type="hidden" name="action" value="update_editor_settings">
+            <div class="form-grid">
+                <div class="form-field full">
+                    <label>Toolbar Buttons</label>
+                    <div style="display:flex;flex-wrap:wrap;gap:1.2em;">
+                        <?php foreach ($editorToolbarOptions as $key => $label): ?>
+                            <label style="display:inline-flex;align-items:center;gap:0.4em;">
+                                <input type="checkbox" name="toolbar[]" value="<?php echo htmlspecialchars($key, ENT_QUOTES, 'UTF-8'); ?>" <?php echo in_array($key, $editorSettings['toolbar'], true) ? 'checked' : ''; ?>>
+                                <?php echo htmlspecialchars($label, ENT_QUOTES, 'UTF-8'); ?>
+                            </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <div style="margin-top:0.7em;font-size:0.92em;color:#888;">
+                        <strong>Note:</strong> Full Screen and Time buttons are always shown.
+                    </div>
+                </div>
+            </div>
+            <div class="form-actions"><button type="submit">Save Editor Settings</button></div>
+        </form>
+    </section>
     <section class="settings-card">
         <h2>Weather Presets</h2>
         <p class="note">Current weather source: <strong><?php echo htmlspecialchars($weatherSelectedLabel, ENT_QUOTES, 'UTF-8'); ?></strong></p>

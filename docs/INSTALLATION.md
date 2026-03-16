@@ -1,6 +1,7 @@
+
 # rJournaler_Web Installation Guide
 
-This guide covers the Windows-to-Windows deployment flow for rJournaler_Web v1.0.4:
+This guide covers the Windows-to-Windows deployment flow for rJournaler_Web v1.0.5:
 
 - source machine: package and transfer build artifact
 - Docker host machine: build images locally and run containers
@@ -60,6 +61,7 @@ Notes:
 - `APP_URL` should be the URL users actually open (not always `localhost`).
 - `DB_HOST` must be reachable from containers running on the Docker host.
 
+
 ## 3. Package On Source Machine
 
 From source repo root:
@@ -88,10 +90,10 @@ if ($actual -ne $expected) { throw "Checksum mismatch" }
 
 ## 5. Build + Deploy On Docker Host
 
-Use the one-command deploy script:
+**Build images for v1.0.5:**
 
 ```powershell
-.\rjournaler_web-src-YYYYMMDD-HHMMSS\scripts\deploy-images.ps1 -PackagePath .\rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz -Tag 1.0.2
+./scripts/build-images-from-package.ps1 -PackagePath .\rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz -Tag 1.0.5
 ```
 
 What this does:
@@ -104,7 +106,7 @@ What this does:
 ## 6. Confirm Running Services
 
 ```powershell
-$env:IMAGE_TAG = "1.0.2"
+$env:IMAGE_TAG = "1.0.5"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml ps
 ```
 
@@ -112,28 +114,33 @@ Open app:
 
 - `http://<docker-host>:8080`
 
+
 ## 7. Useful Operations
 
 Tail logs:
 
 ```powershell
-$env:IMAGE_TAG = "1.0.2"
+$env:IMAGE_TAG = "1.0.5"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml logs -f app worker
 ```
 
 Re-run migrations:
 
 ```powershell
-$env:IMAGE_TAG = "1.0.2"
+$env:IMAGE_TAG = "1.0.5"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml run --rm app php scripts/migrate.php
 ```
 
 Stop/remove containers:
 
 ```powershell
-$env:IMAGE_TAG = "1.0.2"
+$env:IMAGE_TAG = "1.0.5"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml down
 ```
+
+## 8. Exporting Journal Entries (New in v1.0.5)
+
+You can now export your journal entries in Markdown format from the Export Entries page. Choose a time range (day, week, month, months, year, or years). For multi-file exports, a ZIP file will be provided. The export matches your user and only includes your entries.
 
 ## 8. Quick Troubleshooting
 

@@ -22,7 +22,7 @@ if (!in_array($format, ['json', 'csv'], true)) {
 }
 
 $rangeMode = isset($_GET['range']) ? strtolower(trim((string) $_GET['range'])) : 'days';
-$rangeDays = isset($_GET['days']) ? (int) $_GET['days'] : 90;
+$rangeDays = isset($_GET['days']) ? (int) $_GET['days'] : 7;
 $rangeDays = max(7, min(365, $rangeDays));
 $startDate = trim((string) ($_GET['start_date'] ?? ''));
 $endDate = trim((string) ($_GET['end_date'] ?? ''));

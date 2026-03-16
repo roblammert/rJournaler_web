@@ -16,7 +16,6 @@ use App\Security\TrustedDeviceManager;
 
 $error = null;
 $step = 'credentials';
-$appVersion = (string) ($config['version'] ?? '1.0.4');
 
 if (Auth::check()) {
     header('Location: /index.php');
@@ -432,11 +431,6 @@ if (!in_array($interfaceTheme, ['light', 'neutral', 'dark'], true)) {
                 <label for="password">Password</label>
                 <input id="password" name="password" type="password" required>
 
-                <label class="checkbox-row">
-                    <input type="checkbox" name="remember_device" value="1">
-                    Trust this computer for 30 days
-                </label>
-
                 <button type="submit">Continue</button>
             </form>
         <?php else: ?>
@@ -447,6 +441,11 @@ if (!in_array($interfaceTheme, ['light', 'neutral', 'dark'], true)) {
 
                 <label for="totp_code">Authentication Code</label>
                 <input id="totp_code" name="totp_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus>
+
+                <label class="checkbox-row">
+                    <input type="checkbox" name="remember_device" value="1">
+                    Trust this computer for 30 days
+                </label>
 
                 <button type="submit">Log in</button>
             </form>
