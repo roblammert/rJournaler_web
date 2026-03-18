@@ -14,9 +14,20 @@ final class EntryUid
 
     public static function generate(
         string $applicationName = 'rjournaler',
-        string $appVersionCode = 'W010000',
+        ?string $appVersion = null,
         string $timezone = 'America/Chicago'
     ): string {
+        // Use global $appVersion from bootstrap.php
+        global $appVersion;
+
+        if (!isset($appVersion) || !is_string($appVersion) || $appVersion === '') {
+            $appVersion = '1.0.0';
+        }
+        $versionParts = explode('.', $appVersion);
+        $major = str_pad((string)($versionParts[0] ?? '0'), 2, '0', STR_PAD_LEFT);
+        $minor = str_pad((string)($versionParts[1] ?? '0'), 2, '0', STR_PAD_LEFT);
+        $patch = str_pad((string)($versionParts[2] ?? '0'), 2, '0', STR_PAD_LEFT);
+        $appVersionCode = 'W' . $major . $minor . $patch;
         if (!self::isValidAppVersionCode($appVersionCode)) {
             throw new \InvalidArgumentException('Invalid app version code format. Expected [A-Z][0-9]{6}.');
         }
@@ -24,7 +35,7 @@ final class EntryUid
         $timestamp = (new DateTimeImmutable('now', new DateTimeZone($timezone)))->format('YmdHis');
         $suffix = self::randomAlphaNumeric(6);
 
-        return sprintf('%s-%s-%s-%s', $timestamp, strtolower($applicationName), strtoupper($appVersionCode), $suffix);
+        return sprintf('%s-%s-%s-%s', $timestamp, strtolower($applicationName), $appVersionCode, $suffix);
     }
 
     public static function isValid(string $value): bool

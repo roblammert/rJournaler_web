@@ -1,7 +1,7 @@
 
 # rJournaler_Web Installation Guide
 
-This guide covers the Windows-to-Windows deployment flow for rJournaler_Web v1.0.5:
+This guide covers the Windows-to-Windows deployment flow for rJournaler_Web v1.0.6:
 
 - source machine: package and transfer build artifact
 - Docker host machine: build images locally and run containers
@@ -90,10 +90,10 @@ if ($actual -ne $expected) { throw "Checksum mismatch" }
 
 ## 5. Build + Deploy On Docker Host
 
-**Build images for v1.0.5:**
+**Build images for v1.0.6:**
 
 ```powershell
-./scripts/build-images-from-package.ps1 -PackagePath .\rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz -Tag 1.0.5
+./scripts/build-images-from-package.ps1 -PackagePath .\rjournaler_web-src-YYYYMMDD-HHMMSS.tar.gz -Tag 1.0.6
 ```
 
 What this does:
@@ -106,7 +106,7 @@ What this does:
 ## 6. Confirm Running Services
 
 ```powershell
-$env:IMAGE_TAG = "1.0.5"
+$env:IMAGE_TAG = "1.0.6"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml ps
 ```
 
@@ -120,21 +120,21 @@ Open app:
 Tail logs:
 
 ```powershell
-$env:IMAGE_TAG = "1.0.5"
+$env:IMAGE_TAG = "1.0.6"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml logs -f app worker
 ```
 
 Re-run migrations:
 
 ```powershell
-$env:IMAGE_TAG = "1.0.5"
+$env:IMAGE_TAG = "1.0.6"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml run --rm app php scripts/migrate.php
 ```
 
 Stop/remove containers:
 
 ```powershell
-$env:IMAGE_TAG = "1.0.5"
+$env:IMAGE_TAG = "1.0.6"
 docker compose -f .\rjournaler_web-src-YYYYMMDD-HHMMSS\docker-compose.images.yml down
 ```
 

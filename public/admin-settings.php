@@ -17,7 +17,6 @@ $weatherSchemaWarning = null;
 $weatherSchemaMigrationCommand = 'php scripts/migrate.php --to=013_meta_group_3_weather.sql';
 
 $settingSpecs = [
-    'security.trusted_device_days' => ['label' => 'Trusted Device Days', 'type' => 'int', 'min' => 1],
     'processing.queue_complete_retention_hours' => ['label' => 'Queue Complete Retention Hours', 'type' => 'float', 'min' => 0.25],
     'processing.queue_failed_retention_hours' => ['label' => 'Queue Failed Retention Hours', 'type' => 'float', 'min' => 0.25],
     'processing.orchestrator_log_retention_hours' => ['label' => 'Orchestrator Log Retention Hours', 'type' => 'float', 'min' => 0.25],
@@ -341,14 +340,6 @@ try {
                         $success = 'Password reset.';
                     }
                 }
-            } elseif ($action === 'clear_totp') {
-                $targetId = (int) ($_POST['target_user_id'] ?? 0);
-                if ($targetId <= 0) {
-                    $error = 'Invalid user.';
-                } else {
-                    $pdo->prepare('UPDATE users SET totp_secret_encrypted = NULL, updated_at = UTC_TIMESTAMP() WHERE id = :id')->execute(['id' => $targetId]);
-                    $success = 'TOTP cleared for user.';
-                }
             } elseif ($action === 'toggle_admin') {
                 $targetId = (int) ($_POST['target_user_id'] ?? 0);
                 $newValue = ((string) ($_POST['new_is_admin'] ?? '0')) === '1' ? 1 : 0;
@@ -362,14 +353,6 @@ try {
                         'id' => $targetId,
                     ]);
                     $success = 'User role updated.';
-                }
-            } elseif ($action === 'revoke_user_devices') {
-                $targetId = (int) ($_POST['target_user_id'] ?? 0);
-                if ($targetId <= 0) {
-                    $error = 'Invalid user.';
-                } else {
-                    $pdo->prepare('DELETE FROM trusted_devices WHERE user_id = :user_id')->execute(['user_id' => $targetId]);
-                    $success = 'Trusted devices revoked for user.';
                 }
             }
         }

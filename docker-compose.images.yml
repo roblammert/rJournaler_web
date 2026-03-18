@@ -1,6 +1,6 @@
 services:
   app:
-    image: rjournaler-web-app:${IMAGE_TAG:-1.0.3}
+    image: rjournaler-web-app:${IMAGE_TAG:-1.0.6}
     pull_policy: never
     container_name: rjournaler_web_app
     working_dir: /var/www/html
@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: rjournaler-web-worker:${IMAGE_TAG:-1.0.3}
+    image: rjournaler-web-worker:${IMAGE_TAG:-1.0.6}
     pull_policy: never
     container_name: rjournaler_web_worker
     working_dir: /app

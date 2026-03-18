@@ -203,7 +203,7 @@ $username = '';
 $success = null;
 $exportType = $_POST['export_type'] ?? 'month';
 $interfaceTheme = Auth::interfaceTheme();
-$appVersion = $appVersion ?? (string)($config['version'] ?? '1.0.4');
+$appVersion = $appVersion ?? (string)($config['version'] ?? '1.0.6');
 
 try {
     $pdo = Database::connection($config['database']);

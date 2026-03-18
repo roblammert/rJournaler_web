@@ -1295,7 +1295,26 @@ function renderListValues(mixed $value): string
                     <span class="pill">rJournaler_Web: v<?php echo htmlspecialchars($appVersion, ENT_QUOTES, 'UTF-8'); ?></span>
                 </div>
                 <div class="mode-toggle-row" style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:1rem;">
-                    <button id="mode-toggle-pill" type="button" style="border:none;background:#eee;border-radius:999px;padding:0.4rem 1.2rem;font-weight:bold;font-size:1rem;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer;">Mode: Desktop</button>
+                    <button id="mode-toggle-pill" type="button" class="theme-pill-mode-toggle">Mode: Desktop</button>
+                    <style>
+                    .theme-pill-mode-toggle {
+                        border: 1.5px solid var(--control-btn-border);
+                        background: var(--control-btn-bg);
+                        color: var(--control-btn-text);
+                        border-radius: 999px;
+                        padding: 0.4rem 1.2rem;
+                        font-weight: bold;
+                        font-size: 1rem;
+                        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+                        cursor: pointer;
+                        transition: background 0.15s, color 0.15s, border 0.15s;
+                    }
+                    .theme-pill-mode-toggle:hover, .theme-pill-mode-toggle:focus {
+                        background: var(--control-btn-border);
+                        color: var(--control-btn-bg);
+                        outline: none;
+                    }
+                    </style>
                 </div>
             </header>
 

@@ -17,21 +17,8 @@ if ($argc < 5) {
 $username = trim($username);
 $email = trim($email);
 $password = (string) $password;
-$totpSecret = strtoupper(trim($totpSecret));
-
-if ($username === '' || $email === '' || $password === '' || $totpSecret === '') {
+if ($username === '' || $email === '' || $password === '') {
     fwrite(STDERR, "All arguments are required.\n");
-    exit(1);
-}
-
-if (!preg_match('/^[A-Z2-7]{16,128}$/', $totpSecret)) {
-    fwrite(STDERR, "TOTP secret must be base32 characters only (A-Z, 2-7), length 16-128.\n");
-    exit(1);
-}
-
-$appKey = (string) env('APP_KEY', '');
-if (trim($appKey) === '') {
-    fwrite(STDERR, "APP_KEY is required in .env\n");
     exit(1);
 }
 
@@ -43,11 +30,9 @@ if (!is_string($passwordHash) || $passwordHash === '') {
     exit(1);
 }
 
-$encryptedSecret = Crypto::encrypt($totpSecret, $appKey);
-
 $sql = <<<'SQL'
-    INSERT INTO users (username, email, password_hash, totp_secret_encrypted, is_active, is_admin)
-    VALUES (:username, :email, :password_hash, :totp_secret, 1, 0)
+    INSERT INTO users (username, email, password_hash, is_active, is_admin)
+    VALUES (:username, :email, :password_hash, 1, 0)
 SQL;
 
 $stmt = $pdo->prepare($sql);
@@ -55,7 +40,6 @@ $stmt->execute([
     'username' => $username,
     'email' => $email,
     'password_hash' => $passwordHash,
-    'totp_secret' => $encryptedSecret,
 ]);
 
 fwrite(STDOUT, "User created successfully with id " . (string) $pdo->lastInsertId() . PHP_EOL);

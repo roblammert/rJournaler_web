@@ -15,7 +15,7 @@ return [
     'env' => env('APP_ENV', 'development'),
     'debug' => (bool) env('APP_DEBUG', true),
     'url' => (string) env('APP_URL', 'http://localhost:8080'),
-    'version' => (string) env('APP_VERSION', '1.0.3'),
+    'version' => (string) env('APP_VERSION', '1.0.6'),
     'timezone' => (string) env('APP_TIMEZONE', 'UTC'),
     'session' => [
         'name' => (string) env('SESSION_NAME', 'rjournaler_session'),
@@ -23,10 +23,7 @@ return [
         'secure_cookie' => (bool) env('SESSION_SECURE_COOKIE', false),
         'samesite' => (string) env('SESSION_SAMESITE', 'Strict'),
     ],
-    'security' => [
-        'trusted_device_days' => (int) env('TRUSTED_DEVICE_DAYS', 30),
-        'totp_issuer' => (string) env('TOTP_ISSUER', 'rJournaler Web'),
-    ],
+    // 'security' config for TOTP and trusted device removed
     'database' => [
         'host' => $requiredEnv('DB_HOST'),
         'port' => (int) $requiredEnv('DB_PORT'),

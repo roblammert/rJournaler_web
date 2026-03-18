@@ -41,8 +41,6 @@ use App\Core\Database;
 use App\Import\ImportBatchService;
 use App\Security\Crypto;
 use App\Security\Csrf;
-use App\Security\Totp;
-use App\Security\TotpProvisioning;
 $userId = Auth::userId();
 if (!is_int($userId)) {
     header('Location: /login.php');
@@ -382,47 +380,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $error === null) {
                     }
                 }
             }
-        } elseif ($action === 'generate_totp') {
-            $secret = TotpProvisioning::generateSecret();
-            $_SESSION['pending_totp_secret'] = $secret;
-            $success = 'New TOTP secret generated. Confirm to activate.';
-            $successTone = 'info';
-        } elseif ($action === 'confirm_totp') {
-            $pendingSecretCheck = $_SESSION['pending_totp_secret'] ?? null;
-            $code = (string) ($_POST['totp_code'] ?? '');
-            $appKey = (string) env('APP_KEY', '');
-
-            if (!is_string($pendingSecretCheck) || $pendingSecretCheck === '') {
-                $error = 'No pending TOTP secret found. Generate one first.';
-            } elseif ($appKey === '') {
-                $error = 'APP_KEY is missing in .env.';
-            } elseif (!Totp::verify($pendingSecretCheck, $code)) {
-                $error = 'Invalid TOTP code. Please try again.';
-            } else {
-                $encrypted = Crypto::encrypt($pendingSecretCheck, $appKey);
-                $stmt = $pdo->prepare('UPDATE users SET totp_secret_encrypted = :secret, updated_at = UTC_TIMESTAMP() WHERE id = :id');
-                $stmt->execute([
-                    'secret' => $encrypted,
-                    'id' => $userId,
-                ]);
-                unset($_SESSION['pending_totp_secret']);
-                $success = 'TOTP token updated successfully.';
-                $successTone = 'success';
-            }
-        } elseif ($action === 'revoke_device') {
-            $deviceId = (int) ($_POST['device_id'] ?? 0);
-            if ($deviceId > 0) {
-                $pdo->prepare('DELETE FROM trusted_devices WHERE id = :id AND user_id = :user_id')->execute([
-                    'id' => $deviceId,
-                    'user_id' => $userId,
-                ]);
-                $success = 'Trusted device revoked.';
-                $successTone = 'warn';
-            }
-        } elseif ($action === 'revoke_all_devices') {
-            $pdo->prepare('DELETE FROM trusted_devices WHERE user_id = :user_id')->execute(['user_id' => $userId]);
-            $success = 'All trusted devices revoked.';
-            $successTone = 'warn';
         } elseif ($action === 'weather_add_preset') {
             $input = sanitizeWeatherLocationInput($_POST);
             if ($input['zip'] === '' && $input['city'] === '') {
@@ -510,33 +467,11 @@ $user = null;
 $trustedDevices = [];
 if ($error === null) {
     $themeSelectSql = $interfaceThemeEnabled ? 'interface_theme' : "'neutral' AS interface_theme";
-    $stmt = $pdo->prepare('SELECT id, username, email, display_name, timezone_preference, ' . $themeSelectSql . ', totp_secret_encrypted, weather_presets_json, weather_selected_key FROM users WHERE id = :id LIMIT 1');
+    $stmt = $pdo->prepare('SELECT id, username, email, display_name, timezone_preference, ' . $themeSelectSql . ', weather_presets_json, weather_selected_key FROM users WHERE id = :id LIMIT 1');
     $stmt->execute(['id' => $userId]);
     $user = $stmt->fetch();
 
     if (is_array($user)) {
-        $storedSecret = (string) ($user['totp_secret_encrypted'] ?? '');
-        if ($storedSecret !== '') {
-            $secret = resolveTotpSecret($storedSecret);
-            if ($secret !== '') {
-                $accountName = (string) (($user['email'] ?? '') !== '' ? $user['email'] : $user['username']);
-                $issuer = (string) ($config['security']['totp_issuer'] ?? 'rJournaler Web');
-                $currentOtpAuthUri = TotpProvisioning::buildUri($accountName, $secret, $issuer);
-                $currentQrUrl = TotpProvisioning::buildQrUrl($currentOtpAuthUri);
-            }
-        }
-
-        $pendingSecret = $_SESSION['pending_totp_secret'] ?? null;
-        if (is_string($pendingSecret) && $pendingSecret !== '') {
-            $accountName = (string) (($user['email'] ?? '') !== '' ? $user['email'] : $user['username']);
-            $issuer = (string) ($config['security']['totp_issuer'] ?? 'rJournaler Web');
-            $pendingOtpAuthUri = TotpProvisioning::buildUri($accountName, $pendingSecret, $issuer);
-            $pendingQrUrl = TotpProvisioning::buildQrUrl($pendingOtpAuthUri);
-        }
-
-        $devicesStmt = $pdo->prepare('SELECT id, device_name, created_at, last_used_at, expires_at FROM trusted_devices WHERE user_id = :user_id ORDER BY created_at DESC');
-        $devicesStmt->execute(['user_id' => $userId]);
-        $trustedDevices = $devicesStmt->fetchAll();
 
         try {
             $importService = new ImportBatchService();
@@ -1100,73 +1035,7 @@ $formatUtcDateTime = static function (?string $value, string $timezone): string 
         </form>
     </section>
 
-    <section class="settings-card">
-        <h2>TOTP</h2>
-        <?php if (is_string($currentQrUrl) && $currentQrUrl !== ''): ?>
-            <p class="note">Current token QR:</p>
-            <p><a target="_blank" rel="noopener" href="<?php echo htmlspecialchars($currentQrUrl, ENT_QUOTES, 'UTF-8'); ?>">Open current QR</a></p>
-        <?php else: ?>
-            <p class="note">No active TOTP token found.</p>
-        <?php endif; ?>
 
-        <form method="post" action="/user-settings.php" class="settings-form">
-            <input type="hidden" name="_csrf" value="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
-            <input type="hidden" name="action" value="generate_totp">
-            <button type="submit">Generate New TOTP Token</button>
-        </form>
-
-        <?php if (is_string($pendingSecret) && $pendingSecret !== '' && is_string($pendingQrUrl) && is_string($pendingOtpAuthUri)): ?>
-            <p>Pending token key: <code><?php echo htmlspecialchars($pendingSecret, ENT_QUOTES, 'UTF-8'); ?></code></p>
-            <p><a target="_blank" rel="noopener" href="<?php echo htmlspecialchars($pendingQrUrl, ENT_QUOTES, 'UTF-8'); ?>">Open pending QR</a></p>
-            <form method="post" action="/user-settings.php" class="settings-form">
-                <input type="hidden" name="_csrf" value="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
-                <input type="hidden" name="action" value="confirm_totp">
-                <div class="form-grid single">
-                    <div class="form-field">
-                        <label for="totp_code">Enter 6-digit code to activate</label>
-                        <input id="totp_code" name="totp_code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
-                    </div>
-                </div>
-                <div class="form-actions"><button type="submit">Activate New Token</button></div>
-            </form>
-        <?php endif; ?>
-    </section>
-
-    <section class="settings-card">
-        <h2>Remembered Machines</h2>
-        <?php if (count($trustedDevices) === 0): ?>
-            <p class="note">No remembered machines.</p>
-        <?php else: ?>
-            <form method="post" action="/user-settings.php" class="settings-form">
-                <input type="hidden" name="_csrf" value="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
-                <input type="hidden" name="action" value="revoke_all_devices">
-                <button type="submit">Revoke All</button>
-            </form>
-            <div class="table-wrap">
-            <table class="data-table">
-                <thead><tr><th>Device</th><th>Created</th><th>Last Used</th><th>Expires</th><th>Action</th></tr></thead>
-                <tbody>
-                <?php foreach ($trustedDevices as $device): ?>
-                    <tr>
-                        <td><?php echo htmlspecialchars((string) ($device['device_name'] ?? 'Trusted Browser'), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($formatUtcDateTime((string) ($device['created_at'] ?? ''), $displayTimezone), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($formatUtcDateTime((string) ($device['last_used_at'] ?? ''), $displayTimezone), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td><?php echo htmlspecialchars($formatUtcDateTime((string) ($device['expires_at'] ?? ''), $displayTimezone), ENT_QUOTES, 'UTF-8'); ?></td>
-                        <td>
-                            <form method="post" action="/user-settings.php" class="inline-form">
-                                <input type="hidden" name="_csrf" value="<?php echo htmlspecialchars($token, ENT_QUOTES, 'UTF-8'); ?>">
-                                <input type="hidden" name="action" value="revoke_device">
-                                <input type="hidden" name="device_id" value="<?php echo (int) ($device['id'] ?? 0); ?>">
-                                <button type="submit">Revoke</button>
-                            </form>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
-            </div>
-        <?php endif; ?>
-    </section>
 
     <section class="settings-card">
         <h2>Monthly Import</h2>

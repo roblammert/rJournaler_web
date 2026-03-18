@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-$appVersion = (string) ($config['version'] ?? '1.0.5');
+$appVersion = (string) ($config['version'] ?? '1.0.6');
 
 require_once __DIR__ . '/env.php';
 
@@ -37,9 +37,6 @@ try {
         }
 
         switch ($key) {
-            case 'security.trusted_device_days':
-                $config['security']['trusted_device_days'] = max(1, (int) $value);
-                break;
             case 'processing.queue_complete_retention_hours':
                 $config['processing']['queue_complete_retention_hours'] = max(1.0, (float) $value);
                 break;

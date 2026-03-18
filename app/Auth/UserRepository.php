@@ -36,7 +36,7 @@ final class UserRepository
             ? 'interface_theme'
             : "'neutral' AS interface_theme";
 
-        $sql = 'SELECT id, username, email, display_name, timezone_preference, ' . $themeSelect . ', password_hash, totp_secret_encrypted, is_active, is_admin FROM users WHERE username = :username LIMIT 1';
+        $sql = 'SELECT id, username, email, display_name, timezone_preference, ' . $themeSelect . ', password_hash, is_active, is_admin FROM users WHERE username = :username LIMIT 1';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute(['username' => $username]);
         $row = $stmt->fetch();

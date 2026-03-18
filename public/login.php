@@ -11,8 +11,6 @@ use App\Core\Database;
 use App\Security\AuditLogger;
 use App\Security\Crypto;
 use App\Security\Csrf;
-use App\Security\Totp;
-use App\Security\TrustedDeviceManager;
 
 $error = null;
 $step = 'credentials';
@@ -29,27 +27,6 @@ if (isset($_GET['reset']) && $_GET['reset'] === '1') {
 /**
  * TOTP secret supports encrypted `enc:` values and legacy plain/base32 migration values.
  */
-$normalizeTotpSecret = static function (string $raw): string {
-    $secret = trim($raw);
-    if (str_starts_with($secret, 'plain:')) {
-        $secret = substr($secret, 6);
-    }
-    if (str_starts_with($secret, 'base32:')) {
-        $secret = substr($secret, 7);
-    }
-
-    return strtoupper(trim($secret));
-};
-
-$resolveTotpSecret = static function (string $storedValue) use ($normalizeTotpSecret): string {
-    $appKey = (string) env('APP_KEY', '');
-    $decrypted = Crypto::decrypt($storedValue, $appKey);
-    if (is_string($decrypted) && $decrypted !== '') {
-        return $normalizeTotpSecret($decrypted);
-    }
-
-    return $normalizeTotpSecret($storedValue);
-};
 
 $ipAddress = (string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0');
 $auditLogger = null;
@@ -58,16 +35,12 @@ try {
     $pdo = Database::connection($config['database']);
     $userRepository = new UserRepository($pdo);
     $loginService = new LoginService($pdo);
-    $trustedDevices = new TrustedDeviceManager($pdo, $config);
     $auditLogger = new AuditLogger($pdo);
 } catch (Throwable $throwable) {
     http_response_code(500);
     $error = 'Authentication service is unavailable.';
 }
 
-if (isset($_SESSION['pending_auth']) && is_array($_SESSION['pending_auth'])) {
-    $step = 'totp';
-}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $error === null) {
     $csrf = $_POST['_csrf'] ?? null;
@@ -82,7 +55,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $error === null) {
         if ($action === 'credentials') {
             $username = trim((string) ($_POST['username'] ?? ''));
             $password = (string) ($_POST['password'] ?? '');
-            $rememberDevice = isset($_POST['remember_device']) && $_POST['remember_device'] === '1';
 
             if ($username === '' || $password === '') {
                 $error = 'Username and password are required.';
@@ -106,86 +78,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $error === null) {
                     if ($auditLogger instanceof AuditLogger) {
                         $auditLogger->log(null, 'auth.login.invalid_credentials', ['username' => $username]);
                     }
-                } elseif ($trustedDevices->hasValidToken($userId)) {
+                } else {
                     $loginService->recordAttempt($username, $ipAddress, true);
                     if ($auditLogger instanceof AuditLogger) {
-                        $auditLogger->log($userId, 'auth.login.trusted_device_bypass', ['username' => $username]);
+                        $auditLogger->log($userId, 'auth.login.success', ['username' => $username]);
                     }
                     Auth::loginAs(
                         $userId,
                         $isAdmin,
                         $displayName !== '' ? $displayName : $username,
-                        $timezonePreference !== '' ? $timezonePreference : null,
-                        $interfaceTheme !== '' ? $interfaceTheme : null,
-                    );
-                    header('Location: /index.php');
-                    exit;
-                } else {
-                    $rawSecret = (string) ($user['totp_secret_encrypted'] ?? '');
-                    $totpSecret = $resolveTotpSecret($rawSecret);
-
-                    if ($totpSecret === '') {
-                        $error = 'MFA is not configured for this account. Contact an administrator.';
-                        if ($auditLogger instanceof AuditLogger) {
-                            $auditLogger->log($userId, 'auth.login.mfa_not_configured', ['username' => $username]);
-                        }
-                    } else {
-                        if ($auditLogger instanceof AuditLogger) {
-                            $auditLogger->log($userId, 'auth.login.password_ok_totp_required', ['username' => $username]);
-                        }
-                        $_SESSION['pending_auth'] = [
-                            'user_id' => $userId,
-                            'username' => $username,
-                            'totp_secret' => $totpSecret,
-                            'remember_device' => $rememberDevice,
-                        ];
-                        $step = 'totp';
-                    }
-                }
-            }
-        } elseif ($action === 'totp') {
-            $pending = $_SESSION['pending_auth'] ?? null;
-            $code = (string) ($_POST['totp_code'] ?? '');
-
-            if (!is_array($pending)) {
-                $error = 'Session expired. Please log in again.';
-                $step = 'credentials';
-            } else {
-                $pendingUserId = (int) ($pending['user_id'] ?? 0);
-                $pendingUsername = (string) ($pending['username'] ?? '');
-                $pendingSecret = (string) ($pending['totp_secret'] ?? '');
-                $rememberDevice = (bool) ($pending['remember_device'] ?? false);
-
-                if ($pendingUserId <= 0 || $pendingSecret === '' || !Totp::verify($pendingSecret, $code)) {
-                    if ($pendingUsername !== '') {
-                        $loginService->recordAttempt($pendingUsername, $ipAddress, false);
-                    }
-                    $error = 'Invalid authentication code.';
-                    $step = 'totp';
-                    if ($auditLogger instanceof AuditLogger) {
-                        $auditLogger->log($pendingUserId > 0 ? $pendingUserId : null, 'auth.login.totp_invalid', ['username' => $pendingUsername]);
-                    }
-                } else {
-                    $loginService->recordAttempt($pendingUsername, $ipAddress, true);
-                    if ($rememberDevice) {
-                        $trustedDevices->issueToken($pendingUserId, (int) $config['security']['trusted_device_days']);
-                    }
-
-                    if ($auditLogger instanceof AuditLogger) {
-                        $auditLogger->log($pendingUserId, 'auth.login.success', ['username' => $pendingUsername, 'remember_device' => $rememberDevice]);
-                    }
-
-                    unset($_SESSION['pending_auth']);
-                    $userData = $userRepository->findActiveByUsername($pendingUsername);
-                    $isAdmin = is_array($userData) ? ((int) ($userData['is_admin'] ?? 0) === 1) : false;
-                    $displayName = is_array($userData) ? (string) ($userData['display_name'] ?? '') : '';
-                    $timezonePreference = is_array($userData) ? (string) ($userData['timezone_preference'] ?? '') : '';
-                    $interfaceTheme = is_array($userData) ? (string) ($userData['interface_theme'] ?? '') : '';
-
-                    Auth::loginAs(
-                        $pendingUserId,
-                        $isAdmin,
-                        $displayName !== '' ? $displayName : $pendingUsername,
                         $timezonePreference !== '' ? $timezonePreference : null,
                         $interfaceTheme !== '' ? $interfaceTheme : null,
                     );

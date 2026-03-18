@@ -1,9 +1,9 @@
 # rJournaler_Web Build Plan (Approval Draft)
 
 ## 1. Purpose
-Build `rJournaler_Web` v1.0.4, a secure PHP + JavaScript + MySQL journaling web application with a Python processing backend. This project upgrades concepts from `C:\git-repos\Rob_Journaler` (stats, analytics, spellchecking-oriented analysis) into a multi-page web platform.
+Build `rJournaler_Web` v1.0.6, a secure PHP + JavaScript + MySQL journaling web application with a Python processing backend. This project upgrades concepts from `C:\git-repos\Rob_Journaler` (stats, analytics, spellchecking-oriented analysis) into a multi-page web platform.
 
-This document is the implementation plan to review and approve before coding. Updated for v1.0.4 release.
+This document is the implementation plan to review and approve before coding. Updated for v1.0.6 release.
 
 ## 2. Core Requirements (from prompt)
 1. Authentication security:
