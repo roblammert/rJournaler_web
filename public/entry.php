@@ -1742,6 +1742,7 @@ function renderListValues(mixed $value): string
         </div>
     </div>
 
+    <script src="/js/idb-wrapper.js"></script>
     <script>
         const initialEntry = <?php echo $entryJson; ?>;
         const editorToolbarOptions = <?php echo $editorToolbarOptionsJson; ?>;
@@ -2461,52 +2462,22 @@ function renderListValues(mixed $value): string
             }
         }
 
-        // IndexedDB helpers for pending autosaves
-        function idbOpen() {
-            return new Promise((resolve, reject) => {
-                const req = indexedDB.open('rjournaler-db', 1);
-                req.onupgradeneeded = (ev) => {
-                    const db = req.result;
-                    if (!db.objectStoreNames.contains('autosaves')) {
-                        db.createObjectStore('autosaves', { keyPath: 'id', autoIncrement: true });
-                    }
-                };
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => reject(req.error);
-            });
-        }
-
+        // Use idb-wrapper (rjdb) for pending autosaves
         async function idbSavePending(obj) {
-            const db = await idbOpen();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction('autosaves', 'readwrite');
-                const store = tx.objectStore('autosaves');
-                const req = store.add({ data: obj, queuedAt: obj._queued_at, entry_uid: obj.entry_uid || '' });
-                req.onsuccess = () => resolve(req.result);
-                req.onerror = () => reject(req.error);
-            });
+            return rjdb.add('autosaves', { data: obj, queuedAt: obj._queued_at, entry_uid: obj.entry_uid || '', retries: 0 });
         }
 
         async function idbGetAllPending() {
-            const db = await idbOpen();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction('autosaves', 'readonly');
-                const store = tx.objectStore('autosaves');
-                const req = store.getAll();
-                req.onsuccess = () => resolve(req.result || []);
-                req.onerror = () => reject(req.error);
-            });
+            return rjdb.getAll('autosaves');
         }
 
         async function idbDeletePending(id) {
-            const db = await idbOpen();
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction('autosaves', 'readwrite');
-                const store = tx.objectStore('autosaves');
-                const req = store.delete(id);
-                req.onsuccess = () => resolve();
-                req.onerror = () => reject(req.error);
-            });
+            return rjdb.delete('autosaves', id);
+        }
+
+        async function idbUpdatePending(item) {
+            // item should include `id` key
+            return rjdb.put('autosaves', item);
         }
 
         // Flush pending autosaves stored in IndexedDB
@@ -2514,6 +2485,8 @@ function renderListValues(mixed $value): string
             if (!navigator.onLine) return;
             try {
                 const items = await idbGetAllPending();
+                let successes = 0;
+                let failures = 0;
                 for (const row of items.sort((a,b) => (a.id - b.id))) {
                     try {
                         const body = row.data;
@@ -2523,11 +2496,16 @@ function renderListValues(mixed $value): string
                             body: JSON.stringify(body)
                         });
                         if (!resp.ok) {
+                            // increment retries and continue
+                            row.retries = (row.retries || 0) + 1;
+                            await idbUpdatePending(row);
+                            failures++;
                             continue;
                         }
                         const data = await resp.json();
                         if (data && data.ok) {
                             await idbDeletePending(row.id);
+                            successes++;
                             if (data.entry_uid && entryUidInput.value === '') {
                                 entryUidInput.value = data.entry_uid;
                                 history.replaceState({}, '', '/entry.php?uid=' + encodeURIComponent(data.entry_uid));
@@ -2535,9 +2513,21 @@ function renderListValues(mixed $value): string
                             }
                         }
                     } catch (_err) {
-                        // stop and try again later
+                        // increment retries and stop to avoid tight loop
+                        try {
+                            row.retries = (row.retries || 0) + 1;
+                            await idbUpdatePending(row);
+                        } catch (_) {}
                         return;
                     }
+                }
+
+                // Update pending indicator
+                await updatePendingIndicator();
+
+                // Optionally notify user via simple status text update
+                if (successes > 0) {
+                    setSaveStatus(successes + ' draft(s) synced', 'ok', 'Synced');
                 }
             } catch (_e) {
                 // ignore DB issues

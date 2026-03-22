@@ -148,6 +148,8 @@ async function idbDeletePendingSW(id) {
 async function flushPendingFromSW() {
     try {
         const items = await idbGetAllPendingSW();
+        let successes = 0;
+        let remaining = 0;
         for (const row of items.sort((a,b) => (a.id - b.id))) {
             try {
                 const resp = await fetch('/api/entry-autosave.php', {
@@ -155,16 +157,59 @@ async function flushPendingFromSW() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(row.data)
                 });
-                if (!resp.ok) continue;
+                if (!resp.ok) {
+                    row.data.retries = (row.data.retries || 0) + 1;
+                    await idbUpdatePendingSW(row.id, row.data);
+                    remaining++;
+                    continue;
+                }
                 const data = await resp.json();
                 if (data && data.ok) {
                     await idbDeletePendingSW(row.id);
+                    successes++;
                 }
             } catch (e) {
-                // stop processing on errors
-                return;
+                // increment retry and continue
+                try {
+                    row.data.retries = (row.data.retries || 0) + 1;
+                    await idbUpdatePendingSW(row.id, row.data);
+                } catch (_) {}
+                remaining++;
             }
         }
+        // Notify clients of sync result
+        try {
+            const allClients = await self.clients.matchAll({ includeUncontrolled: true });
+            for (const client of allClients) {
+                client.postMessage({ type: 'autosave-sync-result', successes, remaining });
+            }
+        } catch (_) {}
+        // If there are remaining items, re-register sync to retry later
+        if (remaining > 0 && self.registration && self.registration.sync) {
+            try { await self.registration.sync.register('autosave-sync'); } catch (_) {}
+        }
+    } catch (e) {
+        // ignore
+    }
+}
+
+// Helper to update pending item by id in SW (since put wasn't defined earlier)
+async function idbUpdatePendingSW(id, data) {
+    try {
+        const db = await idbOpenSW();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('autosaves', 'readwrite');
+            const store = tx.objectStore('autosaves');
+            const req = store.get(id);
+            req.onsuccess = () => {
+                const existing = req.result || {};
+                const updated = Object.assign({}, existing, { id, data });
+                const putReq = store.put(updated);
+                putReq.onsuccess = () => resolve();
+                putReq.onerror = () => reject(putReq.error);
+            };
+            req.onerror = () => reject(req.error);
+        });
     } catch (e) {
         // ignore
     }
