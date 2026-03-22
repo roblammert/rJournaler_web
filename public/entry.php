@@ -1293,6 +1293,9 @@ function renderListValues(mixed $value): string
                     <a class="pill" href="/index.php">Back to Dashboard</a>
                     <span class="pill">Theme: <?php echo htmlspecialchars(ucfirst($interfaceTheme), ENT_QUOTES, 'UTF-8'); ?></span>
                     <span class="pill">rJournaler_Web: v<?php echo htmlspecialchars($appVersion, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <button id="toast-history-button" type="button" class="pill" aria-expanded="false" style="display:inline-flex;align-items:center;gap:0.45rem;">
+                        Notifications <span id="toast-history-count" style="background:var(--control-btn-bg);border-radius:999px;padding:0.12rem 0.45rem;font-weight:700;">0</span>
+                    </button>
                 </div>
                 <div class="mode-toggle-row" style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:1rem;">
                     <button id="mode-toggle-pill" type="button" class="theme-pill-mode-toggle">Mode: Desktop</button>
@@ -1743,6 +1746,16 @@ function renderListValues(mixed $value): string
     </div>
 
     <script src="/js/idb-wrapper.js"></script>
+    <div id="toast-history-panel" hidden style="position:fixed; right:1rem; bottom:4.5rem; width:340px; max-height:50vh; overflow:auto; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:var(--modal-card-shadow); z-index:1500; padding:0.6rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+            <strong>Notifications</strong>
+            <div>
+                <button id="toast-history-clear" type="button" style="margin-right:0.45rem;">Clear</button>
+                <button id="toast-history-close" type="button">Close</button>
+            </div>
+        </div>
+        <ul id="toast-history-list" style="list-style:none;padding:0;margin:0;font-size:0.95rem;"></ul>
+    </div>
     <script>
         const initialEntry = <?php echo $entryJson; ?>;
         const editorToolbarOptions = <?php echo $editorToolbarOptionsJson; ?>;
@@ -1878,9 +1891,31 @@ function renderListValues(mixed $value): string
             el.style.borderRadius = '8px';
             el.style.boxShadow = '0 6px 18px rgba(2,6,23,0.08)';
             el.style.fontSize = '0.95rem';
-            el.textContent = message;
+            el.style.display = 'flex';
+            el.style.justifyContent = 'space-between';
+            el.style.alignItems = 'center';
+            const text = document.createElement('span');
+            text.textContent = message;
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.textContent = '\u00D7';
+            closeBtn.title = 'Dismiss';
+            closeBtn.style.marginLeft = '0.8rem';
+            closeBtn.style.border = 'none';
+            closeBtn.style.background = 'transparent';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.addEventListener('click', () => {
+                try { el.remove(); } catch (_) {}
+                try { addToHistory(message, type, true); updateHistoryCount(); } catch(_) {}
+            });
+            el.appendChild(text);
+            el.appendChild(closeBtn);
             container.appendChild(el);
-            setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 350); }, 5000);
+            // Auto-dismiss after a short period
+            const dismissTimer = setTimeout(() => { try { el.remove(); } catch(_) {} }, 7000);
+            // Add to history
+            addToHistory(message, type, false);
+            updateHistoryCount();
         }
 
         // Request notification permission when user interacts with the page (deferred)
@@ -1915,6 +1950,101 @@ function renderListValues(mixed $value): string
                 }
             });
         }
+
+        // Toast history storage and UI
+        const TOAST_HISTORY_KEY = 'toast_history_v1';
+
+        function loadHistory() {
+            try {
+                const raw = window.localStorage.getItem(TOAST_HISTORY_KEY) || '[]';
+                return JSON.parse(raw);
+            } catch (_e) { return []; }
+        }
+
+        function saveHistory(list) {
+            try { window.localStorage.setItem(TOAST_HISTORY_KEY, JSON.stringify(list.slice(0,200))); } catch (_) {}
+        }
+
+        function addToHistory(message, type, dismissed) {
+            try {
+                const list = loadHistory();
+                const item = { id: Date.now() + Math.floor(Math.random()*1000), message: String(message), type: String(type || 'info'), timestamp: new Date().toISOString(), dismissed: !!dismissed };
+                list.unshift(item);
+                saveHistory(list);
+                renderHistoryList();
+            } catch (_) {}
+        }
+
+        function updateHistoryCount() {
+            try {
+                const countEl = document.getElementById('toast-history-count');
+                if (!countEl) return;
+                const list = loadHistory();
+                countEl.textContent = String(list.length || 0);
+            } catch (_) {}
+        }
+
+        function renderHistoryList() {
+            try {
+                const listEl = document.getElementById('toast-history-list');
+                if (!listEl) return;
+                const items = loadHistory();
+                listEl.innerHTML = '';
+                if (items.length === 0) {
+                    const li = document.createElement('li'); li.textContent = 'No notifications yet.'; li.style.padding = '0.45rem 0'; listEl.appendChild(li); return;
+                }
+                for (const it of items) {
+                    const li = document.createElement('li');
+                    li.style.display = 'flex';
+                    li.style.justifyContent = 'space-between';
+                    li.style.alignItems = 'center';
+                    li.style.padding = '0.45rem 0';
+                    const left = document.createElement('div');
+                    left.style.flex = '1';
+                    left.innerHTML = '<div style="font-weight:600;">' + escapeHtml(it.message) + '</div><div style="font-size:0.85rem;color:var(--text-muted);">' + new Date(it.timestamp).toLocaleString() + '</div>';
+                    const right = document.createElement('div');
+                    const dismissBtn = document.createElement('button');
+                    dismissBtn.type = 'button';
+                    dismissBtn.textContent = 'Dismiss';
+                    dismissBtn.style.marginLeft = '0.5rem';
+                    dismissBtn.addEventListener('click', () => {
+                        markHistoryDismissed(it.id);
+                    });
+                    right.appendChild(dismissBtn);
+                    li.appendChild(left);
+                    li.appendChild(right);
+                    listEl.appendChild(li);
+                }
+            } catch (_) {}
+        }
+
+        function markHistoryDismissed(id) {
+            try {
+                const list = loadHistory();
+                const next = list.filter(i => i.id !== id);
+                saveHistory(next);
+                renderHistoryList();
+                updateHistoryCount();
+            } catch (_) {}
+        }
+
+        // Wire up history panel buttons
+        const historyButton = document.getElementById('toast-history-button');
+        const historyPanel = document.getElementById('toast-history-panel');
+        const historyClose = document.getElementById('toast-history-close');
+        const historyClear = document.getElementById('toast-history-clear');
+        if (historyButton && historyPanel) {
+            historyButton.addEventListener('click', () => {
+                const open = historyPanel.hidden === false;
+                historyPanel.hidden = open;
+                historyButton.setAttribute('aria-expanded', String(!open));
+                if (!open) { renderHistoryList(); updateHistoryCount(); }
+            });
+        }
+        if (historyClose) historyClose.addEventListener('click', () => { historyPanel.hidden = true; if (historyButton) historyButton.setAttribute('aria-expanded', 'false'); });
+        if (historyClear) historyClear.addEventListener('click', () => { saveHistory([]); renderHistoryList(); updateHistoryCount(); });
+        // Initialize counts
+        renderHistoryList(); updateHistoryCount();
         // After rendering, re-query mobileFullscreenButton
         const editorHeadingSelect = document.getElementById('editor-heading-select');
         const mobileFullscreenButton = editorToolbar
