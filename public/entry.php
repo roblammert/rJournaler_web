@@ -1592,7 +1592,10 @@ function renderListValues(mixed $value): string
                 </section>
             </details>
 
-            <p id="save-status" class="muted"></p>
+            <div style="display:flex;gap:0.6rem;align-items:center;">
+                <p id="save-status" class="muted" style="margin:0;"></p>
+                <button id="flush-pending-button" type="button" hidden style="border-radius:999px;padding:0.25rem 0.5rem;font-size:0.9rem;">Flush pending (0)</button>
+            </div>
         </section>
 
         <aside class="sidebar">
@@ -2502,6 +2505,39 @@ function renderListValues(mixed $value): string
 
         // Try flushing any pending saves on startup (if online).
         tryFlushPendingSaves();
+
+        // Pending saves UI
+        const flushPendingButton = document.getElementById('flush-pending-button');
+        function getPendingAutosaveKeys() {
+            return Object.keys(window.localStorage).filter(k => k.indexOf('pending_autosave_') === 0).sort();
+        }
+
+        function updatePendingIndicator() {
+            try {
+                const keys = getPendingAutosaveKeys();
+                const count = keys.length;
+                if (flushPendingButton) {
+                    flushPendingButton.hidden = count === 0;
+                    flushPendingButton.textContent = 'Flush pending (' + String(count) + ')';
+                }
+            } catch (_err) {
+                // ignore
+            }
+        }
+
+        if (flushPendingButton) {
+            flushPendingButton.addEventListener('click', async () => {
+                setSaveStatus('Flushing pending saves...', 'muted', 'Flushing');
+                await tryFlushPendingSaves();
+                updatePendingIndicator();
+                setSaveStatus('Flush complete', 'ok', 'Flushed');
+            });
+        }
+
+        // Keep indicator up to date
+        window.addEventListener('storage', updatePendingIndicator);
+        window.addEventListener('online', updatePendingIndicator);
+        updatePendingIndicator();
 
         async function saveEntry() {
             saveInFlight = true;
