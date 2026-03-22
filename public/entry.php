@@ -1293,6 +1293,9 @@ function renderListValues(mixed $value): string
                     <a class="pill" href="/index.php">Back to Dashboard</a>
                     <span class="pill">Theme: <?php echo htmlspecialchars(ucfirst($interfaceTheme), ENT_QUOTES, 'UTF-8'); ?></span>
                     <span class="pill">rJournaler_Web: v<?php echo htmlspecialchars($appVersion, ENT_QUOTES, 'UTF-8'); ?></span>
+                    <button id="toast-history-button" type="button" class="pill" aria-expanded="false" style="display:inline-flex;align-items:center;gap:0.45rem;">
+                        Notifications <span id="toast-history-count" style="background:var(--control-btn-bg);border-radius:999px;padding:0.12rem 0.45rem;font-weight:700;">0</span>
+                    </button>
                 </div>
                 <div class="mode-toggle-row" style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:1rem;">
                     <button id="mode-toggle-pill" type="button" class="theme-pill-mode-toggle">Mode: Desktop</button>
@@ -1592,7 +1595,10 @@ function renderListValues(mixed $value): string
                 </section>
             </details>
 
-            <p id="save-status" class="muted"></p>
+            <div style="display:flex;gap:0.6rem;align-items:center;">
+                <p id="save-status" class="muted" style="margin:0;"></p>
+                <button id="flush-pending-button" type="button" hidden style="border-radius:999px;padding:0.25rem 0.5rem;font-size:0.9rem;">Flush pending (0)</button>
+            </div>
         </section>
 
         <aside class="sidebar">
@@ -1739,6 +1745,17 @@ function renderListValues(mixed $value): string
         </div>
     </div>
 
+    <script src="/js/idb-wrapper.js"></script>
+    <div id="toast-history-panel" hidden style="position:fixed; right:1rem; bottom:4.5rem; width:340px; max-height:50vh; overflow:auto; background:var(--surface); border:1px solid var(--border); border-radius:8px; box-shadow:var(--modal-card-shadow); z-index:1500; padding:0.6rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+            <strong>Notifications</strong>
+            <div>
+                <button id="toast-history-clear" type="button" style="margin-right:0.45rem;">Clear</button>
+                <button id="toast-history-close" type="button">Close</button>
+            </div>
+        </div>
+        <ul id="toast-history-list" style="list-style:none;padding:0;margin:0;font-size:0.95rem;"></ul>
+    </div>
     <script>
         const initialEntry = <?php echo $entryJson; ?>;
         const editorToolbarOptions = <?php echo $editorToolbarOptionsJson; ?>;
@@ -1831,6 +1848,203 @@ function renderListValues(mixed $value): string
         }
 
         renderEditorToolbar();
+        // Toast / Notification utilities
+        function ensureToastContainer() {
+            let c = document.getElementById('toast-container');
+            if (c) return c;
+            c = document.createElement('div');
+            c.id = 'toast-container';
+            Object.assign(c.style, {
+                position: 'fixed',
+                right: '1rem',
+                bottom: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                zIndex: 1400,
+                maxWidth: '360px',
+                pointerEvents: 'none'
+            });
+            document.body.appendChild(c);
+            return c;
+        }
+
+        function showToast(message, type = 'info', preferNotification = true) {
+            // Try system notification first
+            if (preferNotification && 'Notification' in window && Notification.permission === 'granted') {
+                try {
+                    new Notification('rJournaler', { body: message });
+                    return;
+                } catch (_) {}
+            }
+
+            const container = ensureToastContainer();
+            const el = document.createElement('div');
+            el.className = 'toast toast-' + type;
+            el.setAttribute('role', 'status');
+            el.setAttribute('aria-live', 'polite');
+            el.style.pointerEvents = 'auto';
+            el.style.background = type === 'ok' || type === 'success' ? '#e6ffef' : (type === 'error' ? '#fff1f0' : '#f5f7fa');
+            el.style.color = '#102a43';
+            el.style.border = '1px solid rgba(0,0,0,0.06)';
+            el.style.padding = '0.6rem 0.9rem';
+            el.style.borderRadius = '8px';
+            el.style.boxShadow = '0 6px 18px rgba(2,6,23,0.08)';
+            el.style.fontSize = '0.95rem';
+            el.style.display = 'flex';
+            el.style.justifyContent = 'space-between';
+            el.style.alignItems = 'center';
+            const text = document.createElement('span');
+            text.textContent = message;
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.textContent = '\u00D7';
+            closeBtn.title = 'Dismiss';
+            closeBtn.style.marginLeft = '0.8rem';
+            closeBtn.style.border = 'none';
+            closeBtn.style.background = 'transparent';
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.addEventListener('click', () => {
+                try { el.remove(); } catch (_) {}
+                try { addToHistory(message, type, true); updateHistoryCount(); } catch(_) {}
+            });
+            el.appendChild(text);
+            el.appendChild(closeBtn);
+            container.appendChild(el);
+            // Auto-dismiss after a short period
+            const dismissTimer = setTimeout(() => { try { el.remove(); } catch(_) {} }, 7000);
+            // Add to history
+            addToHistory(message, type, false);
+            updateHistoryCount();
+        }
+
+        // Request notification permission when user interacts with the page (deferred)
+        function ensureNotificationPermission() {
+            if (!('Notification' in window)) return;
+            if (Notification.permission === 'default') {
+                const onFirst = () => {
+                    try { Notification.requestPermission(); } catch (e) {}
+                    window.removeEventListener('click', onFirst);
+                };
+                window.addEventListener('click', onFirst, { once: true });
+            }
+        }
+
+        // Listen for messages from the service worker to surface sync results
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (ev) => {
+                try {
+                    const data = ev.data || {};
+                    if (!data || typeof data !== 'object') return;
+                    if (data.type === 'autosave-sync-result') {
+                        const successes = Number(data.successes || 0);
+                        const remaining = Number(data.remaining || 0);
+                        let msg = '';
+                        if (successes > 0) msg += successes + ' draft(s) synced';
+                        if (remaining > 0) msg += (msg ? '. ' : '') + remaining + ' remaining — will retry';
+                        if (msg === '') msg = 'Sync complete';
+                        showToast(msg, successes > 0 ? 'success' : 'info', true);
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            });
+        }
+
+        // Toast history storage and UI
+        const TOAST_HISTORY_KEY = 'toast_history_v1';
+
+        function loadHistory() {
+            try {
+                const raw = window.localStorage.getItem(TOAST_HISTORY_KEY) || '[]';
+                return JSON.parse(raw);
+            } catch (_e) { return []; }
+        }
+
+        function saveHistory(list) {
+            try { window.localStorage.setItem(TOAST_HISTORY_KEY, JSON.stringify(list.slice(0,200))); } catch (_) {}
+        }
+
+        function addToHistory(message, type, dismissed) {
+            try {
+                const list = loadHistory();
+                const item = { id: Date.now() + Math.floor(Math.random()*1000), message: String(message), type: String(type || 'info'), timestamp: new Date().toISOString(), dismissed: !!dismissed };
+                list.unshift(item);
+                saveHistory(list);
+                renderHistoryList();
+            } catch (_) {}
+        }
+
+        function updateHistoryCount() {
+            try {
+                const countEl = document.getElementById('toast-history-count');
+                if (!countEl) return;
+                const list = loadHistory();
+                countEl.textContent = String(list.length || 0);
+            } catch (_) {}
+        }
+
+        function renderHistoryList() {
+            try {
+                const listEl = document.getElementById('toast-history-list');
+                if (!listEl) return;
+                const items = loadHistory();
+                listEl.innerHTML = '';
+                if (items.length === 0) {
+                    const li = document.createElement('li'); li.textContent = 'No notifications yet.'; li.style.padding = '0.45rem 0'; listEl.appendChild(li); return;
+                }
+                for (const it of items) {
+                    const li = document.createElement('li');
+                    li.style.display = 'flex';
+                    li.style.justifyContent = 'space-between';
+                    li.style.alignItems = 'center';
+                    li.style.padding = '0.45rem 0';
+                    const left = document.createElement('div');
+                    left.style.flex = '1';
+                    left.innerHTML = '<div style="font-weight:600;">' + escapeHtml(it.message) + '</div><div style="font-size:0.85rem;color:var(--text-muted);">' + new Date(it.timestamp).toLocaleString() + '</div>';
+                    const right = document.createElement('div');
+                    const dismissBtn = document.createElement('button');
+                    dismissBtn.type = 'button';
+                    dismissBtn.textContent = 'Dismiss';
+                    dismissBtn.style.marginLeft = '0.5rem';
+                    dismissBtn.addEventListener('click', () => {
+                        markHistoryDismissed(it.id);
+                    });
+                    right.appendChild(dismissBtn);
+                    li.appendChild(left);
+                    li.appendChild(right);
+                    listEl.appendChild(li);
+                }
+            } catch (_) {}
+        }
+
+        function markHistoryDismissed(id) {
+            try {
+                const list = loadHistory();
+                const next = list.filter(i => i.id !== id);
+                saveHistory(next);
+                renderHistoryList();
+                updateHistoryCount();
+            } catch (_) {}
+        }
+
+        // Wire up history panel buttons
+        const historyButton = document.getElementById('toast-history-button');
+        const historyPanel = document.getElementById('toast-history-panel');
+        const historyClose = document.getElementById('toast-history-close');
+        const historyClear = document.getElementById('toast-history-clear');
+        if (historyButton && historyPanel) {
+            historyButton.addEventListener('click', () => {
+                const open = historyPanel.hidden === false;
+                historyPanel.hidden = open;
+                historyButton.setAttribute('aria-expanded', String(!open));
+                if (!open) { renderHistoryList(); updateHistoryCount(); }
+            });
+        }
+        if (historyClose) historyClose.addEventListener('click', () => { historyPanel.hidden = true; if (historyButton) historyButton.setAttribute('aria-expanded', 'false'); });
+        if (historyClear) historyClear.addEventListener('click', () => { saveHistory([]); renderHistoryList(); updateHistoryCount(); });
+        // Initialize counts
+        renderHistoryList(); updateHistoryCount();
         // After rendering, re-query mobileFullscreenButton
         const editorHeadingSelect = document.getElementById('editor-heading-select');
         const mobileFullscreenButton = editorToolbar
@@ -2435,10 +2649,153 @@ function renderListValues(mixed $value): string
                 refreshStageUi();
 
                 setSaveStatus('Draft autosaved', 'ok', 'Saved');
-            } catch (_error) {
-                setSaveStatus('Autosave error', 'error', 'Error');
+            } catch (err) {
+                // Fallback: queue the autosave in IndexedDB so SW can sync it later.
+                try {
+                    const queued = payload();
+                    queued._queued_at = new Date().toISOString();
+                    await idbSavePending(queued);
+                    setSaveStatus('Saved locally (offline)', 'muted', 'Saved locally');
+                    try {
+                        ensureNotificationPermission();
+                        showToast('Draft saved locally — will sync when online', 'info', true);
+                    } catch (_) {}
+
+                    // If service worker + background sync available, register a sync
+                    if ('serviceWorker' in navigator && 'SyncManager' in window && navigator.serviceWorker.controller) {
+                        try {
+                            const reg = await navigator.serviceWorker.ready;
+                            await reg.sync.register('autosave-sync');
+                        } catch (_e) {
+                            // ignore sync registration failures; we'll flush on online event
+                        }
+                    }
+                } catch (_e) {
+                    setSaveStatus('Autosave error', 'error', 'Error');
+                }
             }
         }
+
+        // Use idb-wrapper (rjdb) for pending autosaves
+        async function idbSavePending(obj) {
+            return rjdb.add('autosaves', { data: obj, queuedAt: obj._queued_at, entry_uid: obj.entry_uid || '', retries: 0 });
+        }
+
+        async function idbGetAllPending() {
+            return rjdb.getAll('autosaves');
+        }
+
+        async function idbDeletePending(id) {
+            return rjdb.delete('autosaves', id);
+        }
+
+        async function idbUpdatePending(item) {
+            // item should include `id` key
+            return rjdb.put('autosaves', item);
+        }
+
+        // Flush pending autosaves stored in IndexedDB
+        async function tryFlushPendingSaves() {
+            if (!navigator.onLine) return;
+            try {
+                const items = await idbGetAllPending();
+                let successes = 0;
+                let failures = 0;
+                for (const row of items.sort((a,b) => (a.id - b.id))) {
+                    try {
+                        const body = row.data;
+                        const resp = await fetch('/api/entry-autosave.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        if (!resp.ok) {
+                            // increment retries and continue
+                            row.retries = (row.retries || 0) + 1;
+                            await idbUpdatePending(row);
+                            failures++;
+                            continue;
+                        }
+                        const data = await resp.json();
+                        if (data && data.ok) {
+                            await idbDeletePending(row.id);
+                            successes++;
+                            if (data.entry_uid && entryUidInput.value === '') {
+                                entryUidInput.value = data.entry_uid;
+                                history.replaceState({}, '', '/entry.php?uid=' + encodeURIComponent(data.entry_uid));
+                                updateTimelineLink();
+                            }
+                        }
+                    } catch (_err) {
+                        // increment retries and stop to avoid tight loop
+                        try {
+                            row.retries = (row.retries || 0) + 1;
+                            await idbUpdatePending(row);
+                        } catch (_) {}
+                        return;
+                    }
+                }
+
+                // Update pending indicator
+                await updatePendingIndicator();
+
+                // Optionally notify user via simple status text update
+                if (successes > 0) {
+                    setSaveStatus(successes + ' draft(s) synced', 'ok', 'Synced');
+                }
+            } catch (_e) {
+                // ignore DB issues
+            }
+        }
+
+        // Register service worker and attempt to flush pending saves on online
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', async () => {
+                try { await navigator.serviceWorker.register('/sw.js'); } catch (_) {}
+            });
+        }
+
+        window.addEventListener('online', () => {
+            tryFlushPendingSaves();
+        });
+
+        // Try flushing any pending saves on startup (if online).
+        tryFlushPendingSaves();
+
+        // Pending saves UI
+        const flushPendingButton = document.getElementById('flush-pending-button');
+        async function getPendingCount() {
+            try {
+                const list = await idbGetAllPending();
+                return Array.isArray(list) ? list.length : 0;
+            } catch (_e) { return 0; }
+        }
+
+        async function updatePendingIndicator() {
+            try {
+                const count = await getPendingCount();
+                if (flushPendingButton) {
+                    flushPendingButton.hidden = count === 0;
+                    flushPendingButton.textContent = 'Flush pending (' + String(count) + ')';
+                }
+            } catch (_err) {
+                // ignore
+            }
+        }
+
+        if (flushPendingButton) {
+            flushPendingButton.addEventListener('click', async () => {
+                setSaveStatus('Flushing pending saves...', 'muted', 'Flushing');
+                await tryFlushPendingSaves();
+                await updatePendingIndicator();
+                setSaveStatus('Flush complete', 'ok', 'Flushed');
+            });
+        }
+
+        // Keep indicator up to date
+        window.addEventListener('storage', updatePendingIndicator);
+        window.addEventListener('online', updatePendingIndicator);
+        updatePendingIndicator();
 
         async function saveEntry() {
             saveInFlight = true;
