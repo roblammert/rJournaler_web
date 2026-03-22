@@ -2439,17 +2439,21 @@ function renderListValues(mixed $value): string
 
                 setSaveStatus('Draft autosaved', 'ok', 'Saved');
             } catch (err) {
-                // Fallback: queue the autosave locally so it can be synced later when online.
+                // Fallback: queue the autosave in IndexedDB so SW can sync it later.
                 try {
                     const queued = payload();
-                    // Attach a timestamp for ordering
                     queued._queued_at = new Date().toISOString();
-                    const key = 'pending_autosave_' + (queued.entry_uid || 'new') + '_' + Date.now();
-                    window.localStorage.setItem(key, JSON.stringify(queued));
+                    await idbSavePending(queued);
                     setSaveStatus('Saved locally (offline)', 'muted', 'Saved locally');
-                    // Attempt to register a sync immediately if online
-                    if (navigator.onLine) {
-                        tryFlushPendingSaves();
+
+                    // If service worker + background sync available, register a sync
+                    if ('serviceWorker' in navigator && 'SyncManager' in window && navigator.serviceWorker.controller) {
+                        try {
+                            const reg = await navigator.serviceWorker.ready;
+                            await reg.sync.register('autosave-sync');
+                        } catch (_e) {
+                            // ignore sync registration failures; we'll flush on online event
+                        }
                     }
                 } catch (_e) {
                     setSaveStatus('Autosave error', 'error', 'Error');
@@ -2457,48 +2461,96 @@ function renderListValues(mixed $value): string
             }
         }
 
-        // Persist pending autosaves in localStorage and flush them when back online.
-        async function tryFlushPendingSaves() {
-            if (!navigator.onLine) return;
-            const keys = Object.keys(window.localStorage).filter(k => k.indexOf('pending_autosave_') === 0).sort();
-            for (const key of keys) {
-                try {
-                    const raw = window.localStorage.getItem(key);
-                    if (!raw) { window.localStorage.removeItem(key); continue; }
-                    const body = JSON.parse(raw);
-                    const resp = await fetch('/api/entry-autosave.php', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(body)
-                    });
-                    if (!resp.ok) {
-                        // Don't remove; try again later
-                        continue;
+        // IndexedDB helpers for pending autosaves
+        function idbOpen() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('rjournaler-db', 1);
+                req.onupgradeneeded = (ev) => {
+                    const db = req.result;
+                    if (!db.objectStoreNames.contains('autosaves')) {
+                        db.createObjectStore('autosaves', { keyPath: 'id', autoIncrement: true });
                     }
-                    const data = await resp.json();
-                    if (data && data.ok) {
-                        window.localStorage.removeItem(key);
-                        if (data.entry_uid && entryUidInput.value === '') {
-                            entryUidInput.value = data.entry_uid;
-                            history.replaceState({}, '', '/entry.php?uid=' + encodeURIComponent(data.entry_uid));
-                            updateTimelineLink();
-                        }
-                    }
-                } catch (_err) {
-                    // Stop processing on first error to avoid tight loops
-                    return;
-                }
-            }
-        }
-
-        // Register a basic service worker to cache static assets and provide offline shell.
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(() => {/* ignore registration failures */});
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
             });
         }
 
-        // Attempt to flush pending saves when the client regains connectivity.
+        async function idbSavePending(obj) {
+            const db = await idbOpen();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('autosaves', 'readwrite');
+                const store = tx.objectStore('autosaves');
+                const req = store.add({ data: obj, queuedAt: obj._queued_at, entry_uid: obj.entry_uid || '' });
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function idbGetAllPending() {
+            const db = await idbOpen();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('autosaves', 'readonly');
+                const store = tx.objectStore('autosaves');
+                const req = store.getAll();
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        async function idbDeletePending(id) {
+            const db = await idbOpen();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('autosaves', 'readwrite');
+                const store = tx.objectStore('autosaves');
+                const req = store.delete(id);
+                req.onsuccess = () => resolve();
+                req.onerror = () => reject(req.error);
+            });
+        }
+
+        // Flush pending autosaves stored in IndexedDB
+        async function tryFlushPendingSaves() {
+            if (!navigator.onLine) return;
+            try {
+                const items = await idbGetAllPending();
+                for (const row of items.sort((a,b) => (a.id - b.id))) {
+                    try {
+                        const body = row.data;
+                        const resp = await fetch('/api/entry-autosave.php', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        if (!resp.ok) {
+                            continue;
+                        }
+                        const data = await resp.json();
+                        if (data && data.ok) {
+                            await idbDeletePending(row.id);
+                            if (data.entry_uid && entryUidInput.value === '') {
+                                entryUidInput.value = data.entry_uid;
+                                history.replaceState({}, '', '/entry.php?uid=' + encodeURIComponent(data.entry_uid));
+                                updateTimelineLink();
+                            }
+                        }
+                    } catch (_err) {
+                        // stop and try again later
+                        return;
+                    }
+                }
+            } catch (_e) {
+                // ignore DB issues
+            }
+        }
+
+        // Register service worker and attempt to flush pending saves on online
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', async () => {
+                try { await navigator.serviceWorker.register('/sw.js'); } catch (_) {}
+            });
+        }
+
         window.addEventListener('online', () => {
             tryFlushPendingSaves();
         });
@@ -2508,14 +2560,16 @@ function renderListValues(mixed $value): string
 
         // Pending saves UI
         const flushPendingButton = document.getElementById('flush-pending-button');
-        function getPendingAutosaveKeys() {
-            return Object.keys(window.localStorage).filter(k => k.indexOf('pending_autosave_') === 0).sort();
+        async function getPendingCount() {
+            try {
+                const list = await idbGetAllPending();
+                return Array.isArray(list) ? list.length : 0;
+            } catch (_e) { return 0; }
         }
 
-        function updatePendingIndicator() {
+        async function updatePendingIndicator() {
             try {
-                const keys = getPendingAutosaveKeys();
-                const count = keys.length;
+                const count = await getPendingCount();
                 if (flushPendingButton) {
                     flushPendingButton.hidden = count === 0;
                     flushPendingButton.textContent = 'Flush pending (' + String(count) + ')';
@@ -2529,7 +2583,7 @@ function renderListValues(mixed $value): string
             flushPendingButton.addEventListener('click', async () => {
                 setSaveStatus('Flushing pending saves...', 'muted', 'Flushing');
                 await tryFlushPendingSaves();
-                updatePendingIndicator();
+                await updatePendingIndicator();
                 setSaveStatus('Flush complete', 'ok', 'Flushed');
             });
         }

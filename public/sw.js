@@ -107,3 +107,71 @@ self.addEventListener('message', (event) => {
         event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))));
     }
 });
+
+// IndexedDB helpers in service worker scope to access pending autosaves
+function idbOpenSW() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open('rjournaler-db', 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains('autosaves')) {
+                db.createObjectStore('autosaves', { keyPath: 'id', autoIncrement: true });
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function idbGetAllPendingSW() {
+    const db = await idbOpenSW();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('autosaves', 'readonly');
+        const store = tx.objectStore('autosaves');
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function idbDeletePendingSW(id) {
+    const db = await idbOpenSW();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction('autosaves', 'readwrite');
+        const store = tx.objectStore('autosaves');
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function flushPendingFromSW() {
+    try {
+        const items = await idbGetAllPendingSW();
+        for (const row of items.sort((a,b) => (a.id - b.id))) {
+            try {
+                const resp = await fetch('/api/entry-autosave.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(row.data)
+                });
+                if (!resp.ok) continue;
+                const data = await resp.json();
+                if (data && data.ok) {
+                    await idbDeletePendingSW(row.id);
+                }
+            } catch (e) {
+                // stop processing on errors
+                return;
+            }
+        }
+    } catch (e) {
+        // ignore
+    }
+}
+
+self.addEventListener('sync', (event) => {
+    if (event.tag === 'autosave-sync') {
+        event.waitUntil(flushPendingFromSW());
+    }
+});
