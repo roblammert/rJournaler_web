@@ -2435,10 +2435,73 @@ function renderListValues(mixed $value): string
                 refreshStageUi();
 
                 setSaveStatus('Draft autosaved', 'ok', 'Saved');
-            } catch (_error) {
-                setSaveStatus('Autosave error', 'error', 'Error');
+            } catch (err) {
+                // Fallback: queue the autosave locally so it can be synced later when online.
+                try {
+                    const queued = payload();
+                    // Attach a timestamp for ordering
+                    queued._queued_at = new Date().toISOString();
+                    const key = 'pending_autosave_' + (queued.entry_uid || 'new') + '_' + Date.now();
+                    window.localStorage.setItem(key, JSON.stringify(queued));
+                    setSaveStatus('Saved locally (offline)', 'muted', 'Saved locally');
+                    // Attempt to register a sync immediately if online
+                    if (navigator.onLine) {
+                        tryFlushPendingSaves();
+                    }
+                } catch (_e) {
+                    setSaveStatus('Autosave error', 'error', 'Error');
+                }
             }
         }
+
+        // Persist pending autosaves in localStorage and flush them when back online.
+        async function tryFlushPendingSaves() {
+            if (!navigator.onLine) return;
+            const keys = Object.keys(window.localStorage).filter(k => k.indexOf('pending_autosave_') === 0).sort();
+            for (const key of keys) {
+                try {
+                    const raw = window.localStorage.getItem(key);
+                    if (!raw) { window.localStorage.removeItem(key); continue; }
+                    const body = JSON.parse(raw);
+                    const resp = await fetch('/api/entry-autosave.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body)
+                    });
+                    if (!resp.ok) {
+                        // Don't remove; try again later
+                        continue;
+                    }
+                    const data = await resp.json();
+                    if (data && data.ok) {
+                        window.localStorage.removeItem(key);
+                        if (data.entry_uid && entryUidInput.value === '') {
+                            entryUidInput.value = data.entry_uid;
+                            history.replaceState({}, '', '/entry.php?uid=' + encodeURIComponent(data.entry_uid));
+                            updateTimelineLink();
+                        }
+                    }
+                } catch (_err) {
+                    // Stop processing on first error to avoid tight loops
+                    return;
+                }
+            }
+        }
+
+        // Register a basic service worker to cache static assets and provide offline shell.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {/* ignore registration failures */});
+            });
+        }
+
+        // Attempt to flush pending saves when the client regains connectivity.
+        window.addEventListener('online', () => {
+            tryFlushPendingSaves();
+        });
+
+        // Try flushing any pending saves on startup (if online).
+        tryFlushPendingSaves();
 
         async function saveEntry() {
             saveInFlight = true;
