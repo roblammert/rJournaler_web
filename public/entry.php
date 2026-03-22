@@ -1835,6 +1835,86 @@ function renderListValues(mixed $value): string
         }
 
         renderEditorToolbar();
+        // Toast / Notification utilities
+        function ensureToastContainer() {
+            let c = document.getElementById('toast-container');
+            if (c) return c;
+            c = document.createElement('div');
+            c.id = 'toast-container';
+            Object.assign(c.style, {
+                position: 'fixed',
+                right: '1rem',
+                bottom: '1rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                zIndex: 1400,
+                maxWidth: '360px',
+                pointerEvents: 'none'
+            });
+            document.body.appendChild(c);
+            return c;
+        }
+
+        function showToast(message, type = 'info', preferNotification = true) {
+            // Try system notification first
+            if (preferNotification && 'Notification' in window && Notification.permission === 'granted') {
+                try {
+                    new Notification('rJournaler', { body: message });
+                    return;
+                } catch (_) {}
+            }
+
+            const container = ensureToastContainer();
+            const el = document.createElement('div');
+            el.className = 'toast toast-' + type;
+            el.setAttribute('role', 'status');
+            el.setAttribute('aria-live', 'polite');
+            el.style.pointerEvents = 'auto';
+            el.style.background = type === 'ok' || type === 'success' ? '#e6ffef' : (type === 'error' ? '#fff1f0' : '#f5f7fa');
+            el.style.color = '#102a43';
+            el.style.border = '1px solid rgba(0,0,0,0.06)';
+            el.style.padding = '0.6rem 0.9rem';
+            el.style.borderRadius = '8px';
+            el.style.boxShadow = '0 6px 18px rgba(2,6,23,0.08)';
+            el.style.fontSize = '0.95rem';
+            el.textContent = message;
+            container.appendChild(el);
+            setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 350); }, 5000);
+        }
+
+        // Request notification permission when user interacts with the page (deferred)
+        function ensureNotificationPermission() {
+            if (!('Notification' in window)) return;
+            if (Notification.permission === 'default') {
+                const onFirst = () => {
+                    try { Notification.requestPermission(); } catch (e) {}
+                    window.removeEventListener('click', onFirst);
+                };
+                window.addEventListener('click', onFirst, { once: true });
+            }
+        }
+
+        // Listen for messages from the service worker to surface sync results
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('message', (ev) => {
+                try {
+                    const data = ev.data || {};
+                    if (!data || typeof data !== 'object') return;
+                    if (data.type === 'autosave-sync-result') {
+                        const successes = Number(data.successes || 0);
+                        const remaining = Number(data.remaining || 0);
+                        let msg = '';
+                        if (successes > 0) msg += successes + ' draft(s) synced';
+                        if (remaining > 0) msg += (msg ? '. ' : '') + remaining + ' remaining — will retry';
+                        if (msg === '') msg = 'Sync complete';
+                        showToast(msg, successes > 0 ? 'success' : 'info', true);
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            });
+        }
         // After rendering, re-query mobileFullscreenButton
         const editorHeadingSelect = document.getElementById('editor-heading-select');
         const mobileFullscreenButton = editorToolbar
@@ -2446,6 +2526,10 @@ function renderListValues(mixed $value): string
                     queued._queued_at = new Date().toISOString();
                     await idbSavePending(queued);
                     setSaveStatus('Saved locally (offline)', 'muted', 'Saved locally');
+                    try {
+                        ensureNotificationPermission();
+                        showToast('Draft saved locally — will sync when online', 'info', true);
+                    } catch (_) {}
 
                     // If service worker + background sync available, register a sync
                     if ('serviceWorker' in navigator && 'SyncManager' in window && navigator.serviceWorker.controller) {
